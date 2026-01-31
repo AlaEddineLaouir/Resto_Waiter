@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ingredients - Admin Dashboard</title>
+    <link rel="stylesheet" href="admin.css">
+</head>
+<body>
+    <div class="admin-container">
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <h2>🍽️ Admin</h2>
+                <span class="tenant-name" id="tenantName">Restaurant</span>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="/admin/" class="nav-item" data-page="dashboard">
+                    <span class="nav-icon">📊</span>
+                    <span>Dashboard</span>
+                </a>
+                <a href="/admin/menu.html" class="nav-item" data-page="menu">
+                    <span class="nav-icon">📋</span>
+                    <span>Menu</span>
+                </a>
+                <a href="/admin/ingredients.html" class="nav-item active" data-page="ingredients">
+                    <span class="nav-icon">🥗</span>
+                    <span>Ingredients</span>
+                </a>
+                <a href="/admin/settings.html" class="nav-item" data-page="settings">
+                    <span class="nav-icon">⚙️</span>
+                    <span>Settings</span>
+                </a>
+            </nav>
+            <div class="sidebar-footer">
+                <div class="user-info">
+                    <span id="userEmail">admin@restaurant.local</span>
+                </div>
+                <button class="btn-logout" onclick="logout()">Logout</button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="main-header">
+                <button class="menu-toggle" onclick="toggleSidebar()">☰</button>
+                <h1>Ingredients</h1>
+                <div class="header-actions">
+                    <button class="btn btn-primary" onclick="showAddIngredientModal()">+ Add Ingredient</button>
+                </div>
+            </header>
+
+            <!-- Login Form -->
+            <div class="login-container" id="loginContainer">
+                <div class="login-card">
+                    <h2>Admin Login</h2>
+                    <form id="loginForm" onsubmit="handleLogin(event)">
+                        <div class="form-group">
+                            <label for="email">Email</label>
+                            <input type="email" id="email" name="email" required placeholder="admin@restaurant.local">
+                        </div>
+                        <div class="form-group">
+                            <label for="password">Password</label>
+                            <input type="password" id="password" name="password" required placeholder="Enter password">
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-block">Login</button>
+                        <p class="login-error" id="loginError"></p>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Ingredients Content -->
+            <div class="ingredients-content" id="ingredientsContent" style="display: none;">
+                <!-- Toolbar -->
+                <div class="toolbar">
+                    <input type="text" class="search-input" id="searchInput" placeholder="Search ingredients..." oninput="filterIngredients()">
+                    <select class="filter-select" id="allergenFilter" onchange="filterIngredients()">
+                        <option value="">All Types</option>
+                        <option value="allergen">Allergens Only</option>
+                        <option value="regular">Regular Only</option>
+                    </select>
+                </div>
+
+                <!-- Stats -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon">🥗</div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="totalIngredients">0</span>
+                            <span class="stat-label">Total Ingredients</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">⚠️</div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="allergenCount">0</span>
+                            <span class="stat-label">Allergens</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Ingredients List -->
+                <div class="card">
+                    <h3>All Ingredients</h3>
+                    <div class="table-container">
+                        <table class="data-table" id="ingredientsTable">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Allergen Info</th>
+                                    <th>Type</th>
+                                    <th>Used In</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ingredientsList">
+                                <tr><td colspan="5" class="loading">Loading ingredients...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Ingredient Modal -->
+    <div class="modal" id="ingredientModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="ingredientModalTitle">Add Ingredient</h3>
+                <button class="modal-close" onclick="hideModal('ingredientModal')">×</button>
+            </div>
+            <div class="modal-body">
+                <form id="ingredientForm">
+                    <input type="hidden" name="id" id="ingredientId">
+                    <div class="form-group">
+                        <label for="ingredientName">Name *</label>
+                        <input type="text" id="ingredientName" name="name" required placeholder="e.g., Mozzarella Cheese">
+                    </div>
+                    <div class="form-group">
+                        <label for="allergenInfo">Allergen Information</label>
+                        <textarea id="allergenInfo" name="allergen_info" placeholder="e.g., Contains dairy, may contain traces of nuts..."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <div class="form-check">
+                            <input type="checkbox" id="isAllergen" name="is_allergen">
+                            <label for="isAllergen">⚠️ This is an allergen</label>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="hideModal('ingredientModal')">Cancel</button>
+                <button class="btn btn-primary" onclick="saveIngredient()">Save Ingredient</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Ingredient Details Modal -->
+    <div class="modal" id="ingredientDetailsModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="detailsTitle">Ingredient Details</h3>
+                <button class="modal-close" onclick="hideModal('ingredientDetailsModal')">×</button>
+            </div>
+            <div class="modal-body">
+                <div id="ingredientDetails">
+                    <p class="loading">Loading...</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="hideModal('ingredientDetailsModal')">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="admin.js"></script>
+    <script>
+        let ingredients = [];
+
+        document.addEventListener('DOMContentLoaded', () => {
+            checkAuth();
+        });
+
+        window.onAuthenticated = loadIngredients;
+
+        async function loadIngredients() {
+            try {
+                ingredients = await apiRequest('/api/admin/ingredients');
+                renderIngredients();
+                updateStats();
+            } catch (error) {
+                console.error('Failed to load ingredients:', error);
+            }
+        }
+
+        function renderIngredients(filtered = null) {
+            const list = document.getElementById('ingredientsList');
+            const data = filtered || ingredients;
+            
+            if (data.length === 0) {
+                list.innerHTML = '<tr><td colspan="5" class="empty">No ingredients found.</td></tr>';
+                return;
+            }
+            
+            list.innerHTML = data.map(ing => `
+                <tr>
+                    <td><strong>${escapeHtml(ing.name)}</strong></td>
+                    <td>${escapeHtml(ing.allergen_info || '-')}</td>
+                    <td>
+                        ${ing.is_allergen ? '<span class="item-badge allergen">⚠️ Allergen</span>' : '<span class="item-badge">Regular</span>'}
+                    </td>
+                    <td>
+                        <button class="btn btn-sm btn-secondary" onclick="showUsedIn('${ing.id}')">View Dishes</button>
+                    </td>
+                    <td>
+                        <div class="table-actions">
+                            <button class="btn btn-sm btn-secondary" onclick="editIngredient('${ing.id}')">Edit</button>
+                            <button class="btn btn-sm btn-danger" onclick="deleteIngredient('${ing.id}')">Delete</button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function updateStats() {
+            document.getElementById('totalIngredients').textContent = ingredients.length;
+            document.getElementById('allergenCount').textContent = ingredients.filter(i => i.is_allergen).length;
+        }
+
+        function filterIngredients() {
+            const search = document.getElementById('searchInput').value.toLowerCase();
+            const allergenFilter = document.getElementById('allergenFilter').value;
+            
+            let filtered = ingredients.filter(ing => {
+                const matchesSearch = !search || ing.name.toLowerCase().includes(search);
+                const matchesAllergen = !allergenFilter ||
+                    (allergenFilter === 'allergen' && ing.is_allergen) ||
+                    (allergenFilter === 'regular' && !ing.is_allergen);
+                
+                return matchesSearch && matchesAllergen;
+            });
+            
+            renderIngredients(filtered);
+        }
+
+        function showAddIngredientModal() {
+            document.getElementById('ingredientModalTitle').textContent = 'Add Ingredient';
+            resetForm('ingredientForm');
+            showModal('ingredientModal');
+        }
+
+        function editIngredient(id) {
+            const ingredient = ingredients.find(i => i.id === id);
+            if (!ingredient) return;
+            
+            document.getElementById('ingredientModalTitle').textContent = 'Edit Ingredient';
+            document.getElementById('ingredientId').value = ingredient.id;
+            document.getElementById('ingredientName').value = ingredient.name;
+            document.getElementById('allergenInfo').value = ingredient.allergen_info || '';
+            document.getElementById('isAllergen').checked = ingredient.is_allergen;
+            
+            showModal('ingredientModal');
+        }
+
+        async function saveIngredient() {
+            const data = getFormData('ingredientForm');
+            const id = data.id;
+            delete data.id;
+            
+            try {
+                if (id) {
+                    await apiRequest(`/api/admin/ingredients/${id}`, {
+                        method: 'PUT',
+                        body: JSON.stringify(data)
+                    });
+                    showNotification('Ingredient updated', 'success');
+                } else {
+                    await apiRequest('/api/admin/ingredients', {
+                        method: 'POST',
+                        body: JSON.stringify(data)
+                    });
+                    showNotification('Ingredient created', 'success');
+                }
+                
+                hideModal('ingredientModal');
+                await loadIngredients();
+            } catch (error) {
+                showNotification(error.message, 'error');
+            }
+        }
+
+        async function deleteIngredient(id) {
+            confirmDelete('Are you sure you want to delete this ingredient? It will be removed from all dishes.', async () => {
+                try {
+                    await apiRequest(`/api/admin/ingredients/${id}`, { method: 'DELETE' });
+                    showNotification('Ingredient deleted', 'success');
+                    await loadIngredients();
+                } catch (error) {
+                    showNotification(error.message, 'error');
+                }
+            });
+        }
+
+        async function showUsedIn(id) {
+            try {
+                const ingredient = await apiRequest(`/api/admin/ingredients/${id}`);
+                
+                document.getElementById('detailsTitle').textContent = ingredient.name;
+                
+                const dishes = ingredient.dishes || [];
+                let html = `
+                    <p><strong>Allergen Info:</strong> ${escapeHtml(ingredient.allergen_info || 'None')}</p>
+                    <p><strong>Type:</strong> ${ingredient.is_allergen ? '⚠️ Allergen' : 'Regular'}</p>
+                    <hr style="margin: 15px 0;">
+                    <h4>Used in ${dishes.length} dish(es):</h4>
+                `;
+                
+                if (dishes.length > 0) {
+                    html += '<ul style="margin-top: 10px;">';
+                    html += dishes.map(d => `<li>${escapeHtml(d.name)} (${escapeHtml(d.category_name)})</li>`).join('');
+                    html += '</ul>';
+                } else {
+                    html += '<p class="empty">Not used in any dishes yet.</p>';
+                }
+                
+                document.getElementById('ingredientDetails').innerHTML = html;
+                showModal('ingredientDetailsModal');
+            } catch (error) {
+                showNotification('Failed to load details', 'error');
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>

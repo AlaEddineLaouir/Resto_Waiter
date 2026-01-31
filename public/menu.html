@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Menu - Restaurant Menu Chatbot</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app-container">
+    <header class="header">
+      <h1>🍽️ La Bella Cucina</h1>
+      <p>Our Menu</p>
+      <nav>
+        <a href="index.html" class="nav-link">Chat</a>
+        <a href="menu.html" class="nav-link active">Menu</a>
+        <a href="setup.html" class="nav-link">⚙️ Settings</a>
+      </nav>
+    </header>
+
+    <main class="menu-container">
+      <div class="search-bar">
+        <input
+          type="text"
+          id="searchInput"
+          placeholder="Search dishes or ingredients..."
+          autocomplete="off"
+        />
+      </div>
+
+      <div id="menuContent" class="menu-content">
+        <div class="loading">Loading menu...</div>
+      </div>
+    </main>
+  </div>
+
+  <script src="menu.js"></script>
+</body>
+</html>

@@ -1,0 +1,67 @@
+.dish {
+  padding: 1rem;
+  background-color: #f8f9fa;
+  border-radius: 6px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.dishInfo {
+  flex: 1;
+}
+
+.dishName {
+  font-weight: 600;
+  font-size: 1.1rem;
+  color: var(--secondary-color);
+}
+
+.dishDescription {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  margin-top: 0.25rem;
+}
+
+.dishTags {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.tag {
+  font-size: 0.75rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 12px;
+  background-color: #e9ecef;
+  color: var(--text-muted);
+}
+
+.tagVegetarian {
+  background-color: #d4edda;
+  color: var(--success-color);
+}
+
+.tagGlutenFree {
+  background-color: #cce5ff;
+  color: #004085;
+}
+
+.dishPrice {
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: var(--primary-color);
+  white-space: nowrap;
+}
+
+@media (max-width: 600px) {
+  .dish {
+    flex-direction: column;
+  }
+
+  .dishPrice {
+    align-self: flex-start;
+  }
+}

@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings - Admin Dashboard</title>
+    <link rel="stylesheet" href="admin.css">
+</head>
+<body>
+    <div class="admin-container">
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <h2>🍽️ Admin</h2>
+                <span class="tenant-name" id="tenantName">Restaurant</span>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="/admin/" class="nav-item" data-page="dashboard">
+                    <span class="nav-icon">📊</span>
+                    <span>Dashboard</span>
+                </a>
+                <a href="/admin/menu.html" class="nav-item" data-page="menu">
+                    <span class="nav-icon">📋</span>
+                    <span>Menu</span>
+                </a>
+                <a href="/admin/ingredients.html" class="nav-item" data-page="ingredients">
+                    <span class="nav-icon">🥗</span>
+                    <span>Ingredients</span>
+                </a>
+                <a href="/admin/settings.html" class="nav-item active" data-page="settings">
+                    <span class="nav-icon">⚙️</span>
+                    <span>Settings</span>
+                </a>
+            </nav>
+            <div class="sidebar-footer">
+                <div class="user-info">
+                    <span id="userEmail">admin@restaurant.local</span>
+                </div>
+                <button class="btn-logout" onclick="logout()">Logout</button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="main-header">
+                <button class="menu-toggle" onclick="toggleSidebar()">☰</button>
+                <h1>Settings</h1>
+            </header>
+
+            <!-- Login Form -->
+            <div class="login-container" id="loginContainer">
+                <div class="login-card">
+                    <h2>Admin Login</h2>
+                    <form id="loginForm" onsubmit="handleLogin(event)">
+                        <div class="form-group">
+                            <label for="email">Email</label>
+                            <input type="email" id="email" name="email" required placeholder="admin@restaurant.local">
+                        </div>
+                        <div class="form-group">
+                            <label for="password">Password</label>
+                            <input type="password" id="password" name="password" required placeholder="Enter password">
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-block">Login</button>
+                        <p class="login-error" id="loginError"></p>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Settings Content -->
+            <div class="settings-content" id="settingsContent" style="display: none;">
+                <!-- Restaurant Settings -->
+                <div class="card">
+                    <h3>🏪 Restaurant Information</h3>
+                    <form id="restaurantForm">
+                        <div class="form-group">
+                            <label for="restaurantName">Restaurant Name</label>
+                            <input type="text" id="restaurantName" name="name" placeholder="Your Restaurant Name">
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="primaryColor">Primary Color</label>
+                                <input type="color" id="primaryColor" name="primaryColor" value="#4a90a4">
+                            </div>
+                            <div class="form-group">
+                                <label for="secondaryColor">Secondary Color</label>
+                                <input type="color" id="secondaryColor" name="secondaryColor" value="#2c3e50">
+                            </div>
+                        </div>
+                        <button type="button" class="btn btn-primary" onclick="saveRestaurantSettings()">Save Changes</button>
+                    </form>
+                </div>
+
+                <!-- API Settings -->
+                <div class="card">
+                    <h3>🤖 AI Chatbot Settings</h3>
+                    <form id="apiForm">
+                        <div class="form-group">
+                            <label for="apiKey">Perplexity AI API Key</label>
+                            <input type="password" id="apiKey" name="api_key" placeholder="Enter your API key">
+                            <small id="apiKeyStatus" style="color: var(--text-muted); display: block; margin-top: 5px;"></small>
+                        </div>
+                        <div class="form-group">
+                            <label for="modelSelect">AI Model</label>
+                            <select id="modelSelect" name="model">
+                                <option value="llama-3.1-sonar-small-128k-online">Sonar Small (Fast)</option>
+                                <option value="llama-3.1-sonar-large-128k-online">Sonar Large (Balanced)</option>
+                                <option value="llama-3.1-sonar-huge-128k-online">Sonar Huge (Best)</option>
+                            </select>
+                        </div>
+                        <button type="button" class="btn btn-primary" onclick="saveApiSettings()">Save API Settings</button>
+                    </form>
+                </div>
+
+                <!-- Export/Import -->
+                <div class="card">
+                    <h3>📦 Data Management</h3>
+                    <p style="margin-bottom: 15px; color: var(--text-muted);">Export your menu data or import from a backup.</p>
+                    <div class="quick-actions">
+                        <button class="action-btn" onclick="exportMenu()">
+                            <span class="action-icon">📤</span>
+                            Export Menu (JSON)
+                        </button>
+                        <label class="action-btn" style="cursor: pointer;">
+                            <span class="action-icon">📥</span>
+                            Import Menu
+                            <input type="file" accept=".json" onchange="importMenu(this)" style="display: none;">
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Danger Zone -->
+                <div class="card" style="border: 1px solid var(--danger-color);">
+                    <h3 style="color: var(--danger-color);">⚠️ Danger Zone</h3>
+                    <p style="margin-bottom: 15px; color: var(--text-muted);">These actions are irreversible. Please proceed with caution.</p>
+                    <button class="btn btn-danger" onclick="clearAllData()">Clear All Menu Data</button>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="admin.js"></script>
+    <script>
+        let settings = {};
+
+        document.addEventListener('DOMContentLoaded', () => {
+            checkAuth();
+        });
+
+        window.onAuthenticated = loadSettings;
+
+        async function loadSettings() {
+            try {
+                settings = await apiRequest('/api/admin/settings');
+                
+                // Populate form
+                document.getElementById('restaurantName').value = settings.name || '';
+                
+                if (settings.branding) {
+                    document.getElementById('primaryColor').value = settings.branding.primaryColor || '#4a90a4';
+                    document.getElementById('secondaryColor').value = settings.branding.secondaryColor || '#2c3e50';
+                }
+                
+                if (settings.config && settings.config.model) {
+                    document.getElementById('modelSelect').value = settings.config.model;
+                }
+                
+                // Show API key status
+                const status = document.getElementById('apiKeyStatus');
+                if (settings.has_api_key) {
+                    status.textContent = '✓ API key is configured';
+                    status.style.color = 'var(--success-color)';
+                } else {
+                    status.textContent = '✗ No API key configured';
+                    status.style.color = 'var(--danger-color)';
+                }
+            } catch (error) {
+                console.error('Failed to load settings:', error);
+            }
+        }
+
+        async function saveRestaurantSettings() {
+            const name = document.getElementById('restaurantName').value;
+            const primaryColor = document.getElementById('primaryColor').value;
+            const secondaryColor = document.getElementById('secondaryColor').value;
+            
+            try {
+                await apiRequest('/api/admin/settings', {
+                    method: 'PUT',
+                    body: JSON.stringify({
+                        name,
+                        branding: { primaryColor, secondaryColor }
+                    })
+                });
+                showNotification('Restaurant settings saved', 'success');
+                
+                // Update sidebar tenant name
+                document.getElementById('tenantName').textContent = name;
+            } catch (error) {
+                showNotification(error.message, 'error');
+            }
+        }
+
+        async function saveApiSettings() {
+            const apiKey = document.getElementById('apiKey').value;
+            const model = document.getElementById('modelSelect').value;
+            
+            const data = {
+                config: { model }
+            };
+            
+            if (apiKey) {
+                data.api_key = apiKey;
+            }
+            
+            try {
+                await apiRequest('/api/admin/settings', {
+                    method: 'PUT',
+                    body: JSON.stringify(data)
+                });
+                showNotification('API settings saved', 'success');
+                
+                // Clear the API key field and update status
+                document.getElementById('apiKey').value = '';
+                const status = document.getElementById('apiKeyStatus');
+                status.textContent = '✓ API key is configured';
+                status.style.color = 'var(--success-color)';
+            } catch (error) {
+                showNotification(error.message, 'error');
+            }
+        }
+
+        async function exportMenu() {
+            try {
+                const data = await apiRequest('/api/admin/export', { method: 'POST' });
+                
+                const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `menu-export-${new Date().toISOString().split('T')[0]}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+                
+                showNotification('Menu exported successfully', 'success');
+            } catch (error) {
+                showNotification('Failed to export menu', 'error');
+            }
+        }
+
+        function importMenu(input) {
+            if (!input.files || !input.files[0]) return;
+            
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    
+                    // Validate structure
+                    if (!data.categories && !data.ingredients) {
+                        throw new Error('Invalid menu file format');
+                    }
+                    
+                    // TODO: Implement import API
+                    showNotification('Import feature coming soon!', 'warning');
+                } catch (error) {
+                    showNotification('Invalid JSON file: ' + error.message, 'error');
+                }
+            };
+            reader.readAsText(input.files[0]);
+            
+            // Reset input
+            input.value = '';
+        }
+
+        function clearAllData() {
+            confirmDelete('Are you absolutely sure? This will permanently delete ALL your menu data including categories, dishes, and ingredients. This action cannot be undone!', async () => {
+                // TODO: Implement clear all data API
+                showNotification('This feature is disabled for safety. Contact support to reset data.', 'warning');
+            });
+        }
+    </script>
+</body>
+</html>

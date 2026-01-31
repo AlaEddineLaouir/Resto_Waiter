@@ -1,0 +1,48 @@
+{
+  "name": "restaurant-menu-chatbot",
+  "version": "4.0.0",
+  "description": "A multi-tenant restaurant menu chatbot SaaS with React, PostgreSQL, MCP, and Perplexity AI",
+  "type": "module",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "start:cluster": "ENABLE_CLUSTERING=true node src/server.js",
+    "dev": "node --watch src/server.js",
+    "dev:full": "concurrently \"npm run dev\" \"npm run frontend:dev\"",
+    "frontend:install": "cd frontend && npm install",
+    "frontend:dev": "cd frontend && npm run dev",
+    "frontend:build": "cd frontend && npm run build",
+    "db:migrate": "node src/db/migrate.js",
+    "db:seed": "node src/db/seed.js",
+    "db:seed:force": "node src/db/seed.js force",
+    "db:clear": "node src/db/seed.js clear",
+    "test": "echo \"No tests yet\"",
+    "lint": "echo \"No linter configured\""
+  },
+  "keywords": [
+    "mcp",
+    "chatbot",
+    "restaurant",
+    "menu",
+    "perplexity",
+    "multi-tenant",
+    "saas",
+    "postgresql"
+  ],
+  "author": "",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^4.18.2",
+    "multer": "^1.4.5-lts.1",
+    "pg": "^8.18.0"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}

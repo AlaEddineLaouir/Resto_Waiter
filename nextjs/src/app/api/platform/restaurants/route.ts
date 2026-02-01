@@ -32,7 +32,7 @@ export async function GET(req: Request) {
             include: { plan: true },
           },
           _count: {
-            select: { dishes: true, categories: true },
+            select: { menus: true, brands: true, locations: true },
           },
         },
         skip: (page - 1) * limit,

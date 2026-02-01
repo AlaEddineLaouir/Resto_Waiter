@@ -5,12 +5,90 @@
  */
 
 import { executeGetMenu } from '@/lib/mcp-tools';
+import { prisma } from '@/lib/prisma';
 
 export const maxDuration = 30;
 
+// Helper to track chat session and update analytics
+async function trackChatSession(tenantId: string, sessionId: string | undefined) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  console.log('[Chat Tracking] tenantId:', tenantId, 'sessionId:', sessionId);
+
+  try {
+    // If no sessionId, this is a new session - create one and update analytics
+    if (!sessionId) {
+      console.log('[Chat Tracking] Creating new session...');
+      // Generate a unique session ID
+      const newSessionId = crypto.randomUUID();
+      
+      // Create a new chat session
+      const chatSession = await prisma.chatSession.create({
+        data: {
+          tenantId,
+          sessionId: newSessionId,
+        },
+      });
+      console.log('[Chat Tracking] Created session:', chatSession.id);
+
+      // Update or create usage analytics for today
+      const analytics = await prisma.usageAnalytics.upsert({
+        where: {
+          restaurantId_date: {
+            restaurantId: tenantId,
+            date: today,
+          },
+        },
+        update: {
+          chatSessions: { increment: 1 },
+          apiCalls: { increment: 1 },
+        },
+        create: {
+          restaurantId: tenantId,
+          date: today,
+          chatSessions: 1,
+          apiCalls: 1,
+          menuViews: 0,
+          uniqueUsers: 0,
+        },
+      });
+      console.log('[Chat Tracking] Updated analytics:', analytics);
+
+      return chatSession.id;
+    }
+
+    // Existing session - just increment API calls
+    await prisma.usageAnalytics.upsert({
+      where: {
+        restaurantId_date: {
+          restaurantId: tenantId,
+          date: today,
+        },
+      },
+      update: {
+        apiCalls: { increment: 1 },
+      },
+      create: {
+        restaurantId: tenantId,
+        date: today,
+        chatSessions: 0,
+        apiCalls: 1,
+        menuViews: 0,
+        uniqueUsers: 0,
+      },
+    });
+
+    return sessionId;
+  } catch (error) {
+    console.error('[Chat Tracking] Error tracking chat session:', error);
+    return sessionId;
+  }
+}
+
 export async function POST(req: Request) {
   try {
-    const { messages, tenantId } = await req.json();
+    const { messages, tenantId, sessionId } = await req.json();
 
     if (!tenantId) {
       return new Response(JSON.stringify({ error: 'Tenant ID required' }), {
@@ -25,6 +103,9 @@ export async function POST(req: Request) {
         headers: { 'Content-Type': 'application/json' },
       });
     }
+
+    // Track chat session and update analytics
+    const currentSessionId = await trackChatSession(tenantId, sessionId);
 
     // Get menu context for the AI
     const menuContext = await executeGetMenu(tenantId);
@@ -112,35 +193,69 @@ Remember: Format responses cleanly without markdown table syntax (no | pipes) an
     // The frontend includes a welcome message that breaks alternation, so we need to rebuild
     const conversationMessages: { role: string; content: string }[] = [];
     
+    console.log('[Chat] Raw messages received:', JSON.stringify(messages.map(m => ({ role: m.role, content: m.content?.substring(0, 50) }))));
+    
     for (const m of messages) {
       // Skip empty messages
       if (!m.content || m.content.trim() === '') continue;
       // Skip system messages (we add our own)
       if (m.role === 'system') continue;
       
-      // For user messages, always add them
+      const lastMessage = conversationMessages[conversationMessages.length - 1];
+      
+      // For user messages
       if (m.role === 'user') {
-        conversationMessages.push({ role: 'user', content: m.content });
+        // If the last message was also a user message, merge them or skip
+        if (lastMessage && lastMessage.role === 'user') {
+          // Merge consecutive user messages
+          lastMessage.content += '\n' + m.content;
+        } else {
+          conversationMessages.push({ role: 'user', content: m.content });
+        }
       }
       // For assistant messages, only add if there's a preceding user message
       else if (m.role === 'assistant') {
-        // Check if the last message we added was from the user
-        if (conversationMessages.length > 0 && 
-            conversationMessages[conversationMessages.length - 1].role === 'user') {
+        // Only add if the last message was from the user
+        if (lastMessage && lastMessage.role === 'user') {
           conversationMessages.push({ role: 'assistant', content: m.content });
         }
-        // Otherwise skip this assistant message (like the welcome message)
+        // Otherwise skip this assistant message (like the welcome message at the start)
       }
     }
+    
+    console.log('[Chat] Processed messages:', JSON.stringify(conversationMessages.map(m => ({ role: m.role, content: m.content?.substring(0, 50) }))));
 
     // Ensure we have at least one user message at the end
     if (conversationMessages.length === 0 || 
         conversationMessages[conversationMessages.length - 1].role !== 'user') {
+      console.log('[Chat] Invalid: no messages or last message is not user');
       return new Response(JSON.stringify({ error: 'Invalid message format' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' },
       });
     }
+    
+    // Final safety check: ensure strict alternation (user, assistant, user, assistant...)
+    // If there are consecutive messages of same role, fix them
+    const finalMessages: { role: string; content: string }[] = [];
+    for (const m of conversationMessages) {
+      const last = finalMessages[finalMessages.length - 1];
+      if (!last) {
+        // First message must be user
+        if (m.role === 'user') {
+          finalMessages.push(m);
+        }
+      } else if (last.role !== m.role) {
+        // Alternating - good
+        finalMessages.push(m);
+      } else if (m.role === 'user') {
+        // Consecutive user messages - merge
+        last.content += '\n' + m.content;
+      }
+      // Skip consecutive assistant messages
+    }
+    
+    console.log('[Chat] Final messages for API:', JSON.stringify(finalMessages.map(m => ({ role: m.role, len: m.content?.length }))));
 
     // Call Perplexity API directly with streaming
     const response = await fetch('https://api.perplexity.ai/chat/completions', {
@@ -153,7 +268,7 @@ Remember: Format responses cleanly without markdown table syntax (no | pipes) an
         model: 'sonar',
         messages: [
           { role: 'system', content: systemPrompt },
-          ...conversationMessages,
+          ...finalMessages,
         ],
         stream: true,
       }),
@@ -165,12 +280,55 @@ Remember: Format responses cleanly without markdown table syntax (no | pipes) an
       throw new Error(`Perplexity API error: ${response.status}`);
     }
 
-    // Return the stream directly
-    return new Response(response.body, {
+    // Create a transform stream to clean up Perplexity's citations from content only
+    const transformStream = new TransformStream({
+      transform(chunk, controller) {
+        const text = new TextDecoder().decode(chunk);
+        
+        // Split into lines and process each SSE line
+        const lines = text.split('\n');
+        const processedLines = lines.map(line => {
+          if (!line.startsWith('data: ') || line === 'data: [DONE]') {
+            return line;
+          }
+          
+          try {
+            const jsonStr = line.slice(6); // Remove "data: " prefix
+            const data = JSON.parse(jsonStr);
+            
+            // Clean citations from the content field only
+            if (data.choices?.[0]?.delta?.content) {
+              data.choices[0].delta.content = data.choices[0].delta.content
+                .replace(/\[\d+\]/g, '')
+                .replace(/\[\d+,\s*\d+\]/g, '');
+            }
+            if (data.choices?.[0]?.message?.content) {
+              data.choices[0].message.content = data.choices[0].message.content
+                .replace(/\[\d+\]/g, '')
+                .replace(/\[\d+,\s*\d+\]/g, '');
+            }
+            
+            return 'data: ' + JSON.stringify(data);
+          } catch {
+            // If parsing fails, return original line
+            return line;
+          }
+        });
+        
+        controller.enqueue(new TextEncoder().encode(processedLines.join('\n')));
+      },
+    });
+
+    // Pipe the response through the transform stream
+    const cleanedStream = response.body?.pipeThrough(transformStream);
+
+    // Return the cleaned stream with session ID in header
+    return new Response(cleanedStream, {
       headers: {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
         'Connection': 'keep-alive',
+        'X-Session-Id': currentSessionId || '',
       },
     });
   } catch (error) {

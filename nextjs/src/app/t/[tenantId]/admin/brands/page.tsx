@@ -1,0 +1,212 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { useRouter, useParams } from 'next/navigation';
+import Link from 'next/link';
+
+interface Brand {
+  id: string;
+  name: string;
+  slug: string;
+  _count: { locations: number; menus: number };
+}
+
+export default function BrandsPage() {
+  const router = useRouter();
+  const params = useParams();
+  const tenantId = params.tenantId as string;
+
+  const [brands, setBrands] = useState<Brand[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [formData, setFormData] = useState({ name: '', slug: '' });
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    fetchBrands();
+  }, []);
+
+  const fetchBrands = async () => {
+    try {
+      const res = await fetch('/api/admin/brands');
+      if (res.status === 401) {
+        router.push(`/t/${tenantId}/admin/login`);
+        return;
+      }
+      const data = await res.json();
+      setBrands(data.brands || []);
+    } catch {
+      setError('Failed to load brands');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+
+    try {
+      const url = editingId ? `/api/admin/brands/${editingId}` : '/api/admin/brands';
+      const method = editingId ? 'PUT' : 'POST';
+
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to save');
+      }
+
+      setShowForm(false);
+      setEditingId(null);
+      setFormData({ name: '', slug: '' });
+      fetchBrands();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save');
+    }
+  };
+
+  const handleEdit = (brand: Brand) => {
+    setFormData({ name: brand.name, slug: brand.slug });
+    setEditingId(brand.id);
+    setShowForm(true);
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Are you sure? This will delete all locations and menus under this brand.')) return;
+
+    try {
+      const res = await fetch(`/api/admin/brands/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Failed to delete');
+      fetchBrands();
+    } catch {
+      setError('Failed to delete brand');
+    }
+  };
+
+  const generateSlug = (name: string) => {
+    return name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-100">
+      <header className="bg-white shadow">
+        <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
+          <div className="flex items-center gap-4">
+            <Link href={`/t/${tenantId}/admin`} className="text-gray-500 hover:text-gray-700">
+              ← Back
+            </Link>
+            <h1 className="text-xl font-bold text-gray-900">Brands</h1>
+          </div>
+          <button
+            onClick={() => { setShowForm(true); setEditingId(null); setFormData({ name: '', slug: '' }); }}
+            className="bg-orange-500 text-white px-4 py-2 rounded-md hover:bg-orange-600"
+          >
+            + Add Brand
+          </button>
+        </div>
+      </header>
+
+      <div className="max-w-7xl mx-auto px-4 py-8">
+        {error && (
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+            {error}
+            <button onClick={() => setError('')} className="float-right">×</button>
+          </div>
+        )}
+
+        {showForm && (
+          <div className="bg-white p-6 rounded-lg shadow mb-6">
+            <h2 className="text-lg font-semibold mb-4">{editingId ? 'Edit Brand' : 'Add Brand'}</h2>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) => {
+                    const name = e.target.value;
+                    setFormData({ name, slug: generateSlug(name) });
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Slug</label>
+                <input
+                  type="text"
+                  value={formData.slug}
+                  onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  required
+                />
+              </div>
+              <div className="flex gap-2">
+                <button type="submit" className="bg-orange-500 text-white px-4 py-2 rounded-md hover:bg-orange-600">
+                  {editingId ? 'Update' : 'Create'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setShowForm(false); setEditingId(null); }}
+                  className="bg-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-400"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        <div className="bg-white rounded-lg shadow">
+          {brands.length === 0 ? (
+            <p className="p-6 text-gray-500 text-center">No brands yet. Add one to get started!</p>
+          ) : (
+            <table className="w-full">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Slug</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Locations</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Menus</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {brands.map((brand) => (
+                  <tr key={brand.id}>
+                    <td className="px-6 py-4 font-medium">{brand.name}</td>
+                    <td className="px-6 py-4 text-gray-500">{brand.slug}</td>
+                    <td className="px-6 py-4">{brand._count.locations}</td>
+                    <td className="px-6 py-4">{brand._count.menus}</td>
+                    <td className="px-6 py-4">
+                      <button onClick={() => handleEdit(brand)} className="text-blue-500 hover:text-blue-700 mr-3">
+                        Edit
+                      </button>
+                      <button onClick={() => handleDelete(brand.id)} className="text-red-500 hover:text-red-700">
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

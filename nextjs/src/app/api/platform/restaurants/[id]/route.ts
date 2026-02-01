@@ -19,8 +19,10 @@ export async function GET(req: Request, { params }: RouteParams) {
       where: { id },
       include: {
         subscription: { include: { plan: true } },
-        categories: { include: { _count: { select: { dishes: true } } } },
-        _count: { select: { dishes: true, chatSessions: true } },
+        brands: true,
+        locations: true,
+        menus: { include: { translations: true } },
+        _count: { select: { menus: true, chatSessions: true, brands: true, locations: true } },
       },
     });
 

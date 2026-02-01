@@ -7,6 +7,8 @@ export async function POST(req: Request) {
   try {
     const { email, password, tenantSlug = 'default' } = await req.json();
 
+    console.log('[LOGIN] Attempt:', { email, tenantSlug });
+
     if (!email || !password) {
       return NextResponse.json(
         { error: 'Email and password are required' },
@@ -18,6 +20,8 @@ export async function POST(req: Request) {
     const tenant = await prisma.tenant.findUnique({
       where: { slug: tenantSlug },
     });
+
+    console.log('[LOGIN] Tenant found:', tenant ? tenant.slug : 'NOT FOUND');
 
     if (!tenant) {
       return NextResponse.json(
@@ -35,6 +39,8 @@ export async function POST(req: Request) {
       },
     });
 
+    console.log('[LOGIN] Admin found:', admin ? admin.email : 'NOT FOUND');
+
     if (!admin) {
       return NextResponse.json(
         { error: 'Invalid credentials' },
@@ -43,7 +49,9 @@ export async function POST(req: Request) {
     }
 
     // Verify password
+    console.log('[LOGIN] Verifying password...');
     const validPassword = await verifyPassword(password, admin.passwordHash);
+    console.log('[LOGIN] Password valid:', validPassword);
     if (!validPassword) {
       return NextResponse.json(
         { error: 'Invalid credentials' },
@@ -56,10 +64,12 @@ export async function POST(req: Request) {
       id: admin.id,
       email: admin.email,
       tenantId: tenant.id,
+      tenantSlug: tenant.slug,
       role: admin.role,
     });
 
-    // Set cookie
+    // Set cookie - path must be / for API routes to receive it
+    // Tenant isolation is enforced by tenantId in the token
     const cookieStore = await cookies();
     cookieStore.set('restaurant-token', token, {
       httpOnly: true,

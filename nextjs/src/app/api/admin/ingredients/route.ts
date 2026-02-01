@@ -14,7 +14,7 @@ export async function GET() {
         tenantId: session.tenantId,
       },
       include: {
-        _count: { select: { dishes: true } },
+        _count: { select: { items: true } },
       },
       orderBy: { name: 'asc' },
     });
@@ -33,7 +33,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { name, allergenInfo, isAllergen } = await req.json();
+    const { name, allergenCode, isAllergen } = await req.json();
 
     if (!name) {
       return NextResponse.json({ error: 'Name is required' }, { status: 400 });
@@ -43,7 +43,7 @@ export async function POST(req: Request) {
       data: {
         tenantId: session.tenantId,
         name,
-        allergenInfo,
+        allergenCode,
         isAllergen: isAllergen || false,
       },
     });

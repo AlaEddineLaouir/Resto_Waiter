@@ -1,5 +1,5 @@
 // Prisma schema for Multi-Tenant Restaurant Menu SaaS
-// Generated from existing PostgreSQL schema
+// Production-grade schema with i18n, locations, options, allergens, and dietary flags
 
 generator client {
   provider = "prisma-client-js"
@@ -20,6 +20,10 @@ model Tenant {
   email           String?   @db.VarChar(255)
   phone           String?   @db.VarChar(50)
   address         String?
+  status          String    @default("active") @db.VarChar(20) // active|suspended|closed
+  defaultCurrency String    @default("EUR") @map("default_currency") @db.VarChar(10)
+  priceTaxPolicy  String    @default("tax_included") @map("price_tax_policy") @db.VarChar(20)
+  defaultLocale   String    @default("en-US") @map("default_locale") @db.VarChar(10)
   config          Json      @default("{}")
   branding        Json      @default("{\"primaryColor\": \"#4a90a4\", \"secondaryColor\": \"#2c3e50\"}")
   apiKeyEncrypted String?   @map("api_key_encrypted")
@@ -29,104 +33,607 @@ model Tenant {
   deletedAt       DateTime? @map("deleted_at") @db.Timestamptz
 
   // Relations
-  categories    Category[]
-  dishes        Dish[]
-  ingredients   Ingredient[]
-  adminUsers    AdminUser[]
-  auditLogs     AuditLog[]
-  chatSessions  ChatSession[]
-  subscription  RestaurantSubscription?
+  brands         Brand[]
+  locations      Location[]
+  menus          Menu[]
+  ingredients    Ingredient[]
+  adminUsers     AdminUser[]
+  auditLogs      AuditLog[]
+  chatSessions   ChatSession[]
+  subscription   RestaurantSubscription?
   usageAnalytics UsageAnalytics[]
+  locales        TenantLocale[]
+  assets         Asset[]
 
   @@index([slug])
   @@map("tenants")
 }
 
 // ============================================
-// MENU STRUCTURE
+// TENANT LOCALES (Supported languages per tenant)
 // ============================================
-model Category {
-  id           String    @id @default(uuid()) @db.Uuid
-  tenantId     String    @map("tenant_id") @db.Uuid
-  name         String    @db.VarChar(255)
-  description  String?
-  displayOrder Int       @default(0) @map("display_order")
-  isActive     Boolean   @default(true) @map("is_active")
-  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz
-  deletedAt    DateTime? @map("deleted_at") @db.Timestamptz
+model TenantLocale {
+  id        String  @id @default(uuid()) @db.Uuid
+  tenantId  String  @map("tenant_id") @db.Uuid
+  locale    String  @db.VarChar(10)
+  isDefault Boolean @default(false) @map("is_default")
 
-  // Relations
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  dishes Dish[]
 
-  @@unique([tenantId, name, deletedAt])
-  @@index([tenantId])
-  @@map("categories")
+  @@unique([tenantId, locale])
+  @@map("tenant_locales")
 }
 
-model Dish {
+// ============================================
+// BRANDS (Organizations within a tenant)
+// ============================================
+model Brand {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  name      String   @db.VarChar(255)
+  slug      String   @db.VarChar(100)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  tenant    Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  locations Location[]
+  menus     Menu[]
+
+  @@unique([tenantId, slug])
+  @@map("brands")
+}
+
+// ============================================
+// LOCATIONS (Physical branches, ghost kitchens)
+// ============================================
+model Location {
+  id              String   @id @default(uuid()) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  brandId         String   @map("brand_id") @db.Uuid
+  slug            String   @db.VarChar(100)
+  name            String   @db.VarChar(255)
+  addressLine1    String?  @map("address_line1")
+  addressLine2    String?  @map("address_line2")
+  city            String?  @db.VarChar(100)
+  postalCode      String?  @map("postal_code") @db.VarChar(20)
+  countryCode     String   @default("FR") @map("country_code") @db.Char(2)
+  timezone        String   @default("Europe/Paris") @db.VarChar(50)
+  phone           String?  @db.VarChar(30)
+  email           String?  @db.VarChar(255)
+  serviceDineIn   Boolean  @default(true) @map("service_dine_in")
+  serviceTakeaway Boolean  @default(true) @map("service_takeaway")
+  serviceDelivery Boolean  @default(false) @map("service_delivery")
+  isActive        Boolean  @default(true) @map("is_active")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  tenant           Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  brand            Brand             @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  diningTables     DiningTable[]
+  menuPublications MenuPublication[]
+
+  @@unique([tenantId, slug])
+  @@unique([tenantId, brandId, name])
+  @@index([tenantId])
+  @@map("locations")
+}
+
+// ============================================
+// DINING TABLES (For QR codes)
+// ============================================
+model DiningTable {
+  id          String  @id @default(uuid()) @db.Uuid
+  tenantId    String  @map("tenant_id") @db.Uuid
+  locationId  String  @map("location_id") @db.Uuid
+  label       String  @db.VarChar(50)
+  qrCodeValue String  @map("qr_code_value") @db.VarChar(255)
+  isActive    Boolean @default(true) @map("is_active")
+
+  location Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, locationId, label])
+  @@unique([tenantId, locationId, qrCodeValue])
+  @@map("dining_tables")
+}
+
+// ============================================
+// MENUS (Menu containers like Dinner, Lunch, Drinks)
+// ============================================
+model Menu {
+  id             String    @id @default(uuid()) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  brandId        String    @map("brand_id") @db.Uuid
+  code           String    @db.VarChar(50)
+  currency       String?   @db.VarChar(10)
+  priceTaxPolicy String?   @map("price_tax_policy") @db.VarChar(20)
+  defaultLocale  String?   @map("default_locale") @db.VarChar(10)
+  status         String    @default("draft") @db.VarChar(20) // draft | published | archived
+  isActive       Boolean   @default(true) @map("is_active")
+  publishedAt    DateTime? @map("published_at") @db.Timestamptz
+  archivedAt     DateTime? @map("archived_at") @db.Timestamptz
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  tenant            Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  brand             Brand                  @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  translations      MenuI18n[]
+  availabilityRules MenuAvailabilityRule[]
+  lines             MenuLine[]
+  menuSections      MenuSection[]
+  menuItems         MenuItem[]
+  optionGroups      OptionGroup[]
+  publications      MenuPublication[]
+
+  @@unique([tenantId, brandId, code])
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@map("menus")
+}
+
+model MenuI18n {
+  id          String  @id @default(uuid()) @db.Uuid
+  tenantId    String  @map("tenant_id") @db.Uuid
+  menuId      String  @map("menu_id") @db.Uuid
+  locale      String  @db.VarChar(10)
+  name        String  @db.VarChar(255)
+  description String?
+
+  menu Menu @relation(fields: [menuId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, menuId, locale])
+  @@map("menu_i18n")
+}
+
+model MenuAvailabilityRule {
+  id             String    @id @default(uuid()) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  menuId         String    @map("menu_id") @db.Uuid
+  serviceType    String    @default("any") @map("service_type") @db.VarChar(20)
+  dowMask        Int       @map("dow_mask")
+  startTimeLocal String    @map("start_time_local") @db.VarChar(5)
+  endTimeLocal   String    @map("end_time_local") @db.VarChar(5)
+  startDateLocal DateTime? @map("start_date_local") @db.Date
+  endDateLocal   DateTime? @map("end_date_local") @db.Date
+
+  menu Menu @relation(fields: [menuId], references: [id], onDelete: Cascade)
+
+  @@map("menu_availability_rules")
+}
+
+// ============================================
+// MENU PUBLICATION (For location-specific assignments)
+// ============================================
+model MenuPublication {
+  id         String    @id @default(uuid()) @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  locationId String    @map("location_id") @db.Uuid
+  menuId     String    @map("menu_id") @db.Uuid
+  goesLiveAt DateTime  @default(now()) @map("goes_live_at") @db.Timestamptz
+  retiresAt  DateTime? @map("retires_at") @db.Timestamptz
+  isCurrent  Boolean   @default(true) @map("is_current")
+
+  location Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  menu     Menu     @relation(fields: [menuId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, locationId, menuId])
+  @@map("menu_publications")
+}
+
+// ============================================
+// MENU LINE (Unified content lines: sections or items)
+// ============================================
+model MenuLine {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  menuId       String   @map("menu_id") @db.Uuid
+  lineType     String   @map("line_type") @db.VarChar(20) // section | item
+  sectionId    String?  @map("section_id") @db.Uuid
+  itemId       String?  @map("item_id") @db.Uuid
+  parentLineId String?  @map("parent_line_id") @db.Uuid // For nested sections
+  displayOrder Int      @default(0) @map("display_order")
+  isEnabled    Boolean  @default(true) @map("is_enabled") // Availability toggle
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  menu       Menu       @relation(fields: [menuId], references: [id], onDelete: Cascade)
+  section    Section?   @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  item       Item?      @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  parentLine MenuLine?  @relation("MenuLineNesting", fields: [parentLineId], references: [id], onDelete: SetNull)
+  childLines MenuLine[] @relation("MenuLineNesting")
+
+  @@unique([tenantId, menuId, sectionId], map: "menu_line_section_unique")
+  @@unique([tenantId, menuId, itemId], map: "menu_line_item_unique")
+  @@index([tenantId, menuId])
+  @@index([tenantId, menuId, parentLineId])
+  @@map("menu_lines")
+}
+
+// ============================================
+// SECTIONS (Reusable categories, shared across menu versions)
+// ============================================
+model Section {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  translations SectionI18n[]
+  items        Item[]
+  menuSections MenuSection[]
+  menuLines    MenuLine[]
+
+  @@index([tenantId])
+  @@map("sections")
+}
+
+// Join table: Menu <-> Section (with display order per menu)
+model MenuSection {
+  id           String @id @default(uuid()) @db.Uuid
+  tenantId     String @map("tenant_id") @db.Uuid
+  menuId       String @map("menu_id") @db.Uuid
+  sectionId    String @map("section_id") @db.Uuid
+  displayOrder Int    @default(0) @map("display_order")
+
+  menu    Menu    @relation(fields: [menuId], references: [id], onDelete: Cascade)
+  section Section @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, menuId, sectionId])
+  @@index([tenantId, menuId])
+  @@map("menu_sections")
+}
+
+model SectionI18n {
+  id          String  @id @default(uuid()) @db.Uuid
+  tenantId    String  @map("tenant_id") @db.Uuid
+  sectionId   String  @map("section_id") @db.Uuid
+  locale      String  @db.VarChar(10)
+  title       String  @db.VarChar(255)
+  description String?
+
+  section Section @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, sectionId, locale])
+  @@map("section_i18n")
+}
+
+// ============================================
+// ITEMS (Reusable dishes/drinks, shared across menu versions)
+// ============================================
+model Item {
+  id             String   @id @default(uuid()) @db.Uuid
+  tenantId       String   @map("tenant_id") @db.Uuid
+  sectionId      String   @map("section_id") @db.Uuid
+  sku            String?  @db.VarChar(50)
+  isVisible      Boolean  @default(true) @map("is_visible")
+  spicinessLevel Int?     @map("spiciness_level") @db.SmallInt
+  calories       Int?
+  imageAssetId   String?  @map("image_asset_id") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  section        Section             @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  imageAsset     Asset?              @relation(fields: [imageAssetId], references: [id], onDelete: SetNull)
+  translations   ItemI18n[]
+  priceBase      ItemPriceBase?
+  priceOverrides ItemPriceOverride[]
+  optionGroups   ItemOptionGroup[]
+  allergens      ItemAllergen[]
+  dietaryFlags   ItemDietaryFlag[]
+  ingredients    ItemIngredient[]
+  menuItems      MenuItem[]
+  menuLines      MenuLine[]
+
+  @@index([tenantId, sectionId])
+  @@map("items")
+}
+
+// Join table: Menu <-> Item (with section context and display order)
+model MenuItem {
+  id           String @id @default(uuid()) @db.Uuid
+  tenantId     String @map("tenant_id") @db.Uuid
+  menuId       String @map("menu_id") @db.Uuid
+  sectionId    String @map("section_id") @db.Uuid
+  itemId       String @map("item_id") @db.Uuid
+  displayOrder Int    @default(0) @map("display_order")
+
+  menu Menu @relation(fields: [menuId], references: [id], onDelete: Cascade)
+  item Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, menuId, itemId])
+  @@index([tenantId, menuId, sectionId])
+  @@map("menu_items")
+}
+
+model ItemI18n {
+  id          String  @id @default(uuid()) @db.Uuid
+  tenantId    String  @map("tenant_id") @db.Uuid
+  itemId      String  @map("item_id") @db.Uuid
+  locale      String  @db.VarChar(10)
+  name        String  @db.VarChar(255)
+  description String?
+
+  item Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, itemId, locale])
+  @@map("item_i18n")
+}
+
+// ============================================
+// ITEM PRICING
+// ============================================
+model ItemPriceBase {
+  id          String @id @default(uuid()) @db.Uuid
+  tenantId    String @map("tenant_id") @db.Uuid
+  itemId      String @unique @map("item_id") @db.Uuid
+  currency    String @db.VarChar(10)
+  amountMinor BigInt @map("amount_minor")
+
+  item Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@map("item_price_base")
+}
+
+model ItemPriceOverride {
+  id             String    @id @default(uuid()) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  itemId         String    @map("item_id") @db.Uuid
+  locationId     String?   @map("location_id") @db.Uuid
+  serviceType    String    @default("any") @map("service_type") @db.VarChar(20)
+  dowMask        Int?      @map("dow_mask")
+  startTimeLocal String?   @map("start_time_local") @db.VarChar(5)
+  endTimeLocal   String?   @map("end_time_local") @db.VarChar(5)
+  startDateLocal DateTime? @map("start_date_local") @db.Date
+  endDateLocal   DateTime? @map("end_date_local") @db.Date
+  currency       String?   @db.VarChar(10)
+  amountMinor    BigInt    @map("amount_minor")
+
+  item Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@map("item_price_overrides")
+}
+
+// ============================================
+// OPTION GROUPS & OPTIONS (Sizes, Sides, Add-ons)
+// ============================================
+model OptionGroup {
+  id            String  @id @default(uuid()) @db.Uuid
+  tenantId      String  @map("tenant_id") @db.Uuid
+  menuId        String  @map("menu_id") @db.Uuid
+  code          String? @db.VarChar(50)
+  selectionMode String  @map("selection_mode") @db.VarChar(20)
+  minSelect     Int     @default(0) @map("min_select")
+  maxSelect     Int?    @map("max_select")
+  isRequired    Boolean @default(false) @map("is_required")
+  displayOrder  Int     @default(0) @map("display_order")
+  isActive      Boolean @default(true) @map("is_active")
+
+  menu         Menu              @relation(fields: [menuId], references: [id], onDelete: Cascade)
+  translations OptionGroupI18n[]
+  items        ItemOptionGroup[]
+  options      OptionItem[]
+
+  @@map("option_groups")
+}
+
+model OptionGroupI18n {
+  id            String  @id @default(uuid()) @db.Uuid
+  tenantId      String  @map("tenant_id") @db.Uuid
+  optionGroupId String  @map("option_group_id") @db.Uuid
+  locale        String  @db.VarChar(10)
+  name          String  @db.VarChar(255)
+  description   String?
+
+  optionGroup OptionGroup @relation(fields: [optionGroupId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, optionGroupId, locale])
+  @@map("option_group_i18n")
+}
+
+model ItemOptionGroup {
+  id            String @id @default(uuid()) @db.Uuid
+  tenantId      String @map("tenant_id") @db.Uuid
+  itemId        String @map("item_id") @db.Uuid
+  optionGroupId String @map("option_group_id") @db.Uuid
+  displayOrder  Int    @default(0) @map("display_order")
+
+  item        Item        @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  optionGroup OptionGroup @relation(fields: [optionGroupId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, itemId, optionGroupId])
+  @@map("item_option_groups")
+}
+
+model OptionItem {
+  id            String  @id @default(uuid()) @db.Uuid
+  tenantId      String  @map("tenant_id") @db.Uuid
+  optionGroupId String  @map("option_group_id") @db.Uuid
+  code          String? @db.VarChar(50)
+  displayOrder  Int     @default(0) @map("display_order")
+  isDefault     Boolean @default(false) @map("is_default")
+  isActive      Boolean @default(true) @map("is_active")
+
+  optionGroup  OptionGroup          @relation(fields: [optionGroupId], references: [id], onDelete: Cascade)
+  translations OptionItemI18n[]
+  price        OptionItemPrice?
+  allergens    OptionItemAllergen[]
+
+  @@map("option_items")
+}
+
+model OptionItemI18n {
+  id           String  @id @default(uuid()) @db.Uuid
+  tenantId     String  @map("tenant_id") @db.Uuid
+  optionItemId String  @map("option_item_id") @db.Uuid
+  locale       String  @db.VarChar(10)
+  name         String  @db.VarChar(255)
+  description  String?
+
+  optionItem OptionItem @relation(fields: [optionItemId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, optionItemId, locale])
+  @@map("option_item_i18n")
+}
+
+model OptionItemPrice {
+  id           String @id @default(uuid()) @db.Uuid
+  tenantId     String @map("tenant_id") @db.Uuid
+  optionItemId String @unique @map("option_item_id") @db.Uuid
+  currency     String @db.VarChar(10)
+  deltaMinor   BigInt @map("delta_minor")
+
+  optionItem OptionItem @relation(fields: [optionItemId], references: [id], onDelete: Cascade)
+
+  @@map("option_item_prices")
+}
+
+// ============================================
+// ALLERGENS (Master vocabulary)
+// ============================================
+model Allergen {
+  code      String @id @db.VarChar(50)
+  sortOrder Int    @default(0) @map("sort_order")
+
+  translations    AllergenI18n[]
+  itemAllergens   ItemAllergen[]
+  optionAllergens OptionItemAllergen[]
+
+  @@map("allergens")
+}
+
+model AllergenI18n {
+  id           String @id @default(uuid()) @db.Uuid
+  allergenCode String @map("allergen_code") @db.VarChar(50)
+  locale       String @db.VarChar(10)
+  name         String @db.VarChar(100)
+
+  allergen Allergen @relation(fields: [allergenCode], references: [code], onDelete: Cascade)
+
+  @@unique([allergenCode, locale])
+  @@map("allergen_i18n")
+}
+
+model ItemAllergen {
+  id           String @id @default(uuid()) @db.Uuid
+  tenantId     String @map("tenant_id") @db.Uuid
+  itemId       String @map("item_id") @db.Uuid
+  allergenCode String @map("allergen_code") @db.VarChar(50)
+
+  item     Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  allergen Allergen @relation(fields: [allergenCode], references: [code], onDelete: Restrict)
+
+  @@unique([tenantId, itemId, allergenCode])
+  @@map("item_allergens")
+}
+
+model OptionItemAllergen {
+  id           String @id @default(uuid()) @db.Uuid
+  tenantId     String @map("tenant_id") @db.Uuid
+  optionItemId String @map("option_item_id") @db.Uuid
+  allergenCode String @map("allergen_code") @db.VarChar(50)
+
+  optionItem OptionItem @relation(fields: [optionItemId], references: [id], onDelete: Cascade)
+  allergen   Allergen   @relation(fields: [allergenCode], references: [code], onDelete: Restrict)
+
+  @@unique([tenantId, optionItemId, allergenCode])
+  @@map("option_item_allergens")
+}
+
+// ============================================
+// DIETARY FLAGS (Vegetarian, Vegan, Halal, etc.)
+// ============================================
+model DietaryFlag {
+  code      String @id @db.VarChar(50)
+  sortOrder Int    @default(0) @map("sort_order")
+
+  translations DietaryFlagI18n[]
+  itemFlags    ItemDietaryFlag[]
+
+  @@map("dietary_flags")
+}
+
+model DietaryFlagI18n {
+  id              String @id @default(uuid()) @db.Uuid
+  dietaryFlagCode String @map("dietary_flag_code") @db.VarChar(50)
+  locale          String @db.VarChar(10)
+  name            String @db.VarChar(100)
+
+  dietaryFlag DietaryFlag @relation(fields: [dietaryFlagCode], references: [code], onDelete: Cascade)
+
+  @@unique([dietaryFlagCode, locale])
+  @@map("dietary_flag_i18n")
+}
+
+model ItemDietaryFlag {
+  id              String @id @default(uuid()) @db.Uuid
+  tenantId        String @map("tenant_id") @db.Uuid
+  itemId          String @map("item_id") @db.Uuid
+  dietaryFlagCode String @map("dietary_flag_code") @db.VarChar(50)
+
+  item        Item        @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  dietaryFlag DietaryFlag @relation(fields: [dietaryFlagCode], references: [code], onDelete: Restrict)
+
+  @@unique([tenantId, itemId, dietaryFlagCode])
+  @@map("item_dietary_flags")
+}
+
+// ============================================
+// INGREDIENTS (For items)
+// ============================================
+model Ingredient {
   id           String    @id @default(uuid()) @db.Uuid
   tenantId     String    @map("tenant_id") @db.Uuid
-  categoryId   String    @map("category_id") @db.Uuid
   name         String    @db.VarChar(255)
-  description  String?
-  price        Decimal   @db.Decimal(10, 2)
-  imageUrl     String?   @map("image_url")
-  isVegetarian Boolean   @default(false) @map("is_vegetarian")
-  isAvailable  Boolean   @default(true) @map("is_available")
-  allergens    String[]  @default([])
-  displayOrder Int       @default(0) @map("display_order")
+  allergenCode String?   @map("allergen_code") @db.VarChar(50)
+  isAllergen   Boolean   @default(false) @map("is_allergen")
   createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz
   deletedAt    DateTime? @map("deleted_at") @db.Timestamptz
 
-  // Relations
-  tenant      Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  category    Category         @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  ingredients DishIngredient[]
-
-  @@index([tenantId])
-  @@index([categoryId])
-  @@map("dishes")
-}
-
-model Ingredient {
-  id          String    @id @default(uuid()) @db.Uuid
-  tenantId    String    @map("tenant_id") @db.Uuid
-  name        String    @db.VarChar(255)
-  allergenInfo String?  @map("allergen_info")
-  isAllergen  Boolean   @default(false) @map("is_allergen")
-  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
-  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz
-
-  // Relations
   tenant Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  dishes DishIngredient[]
+  items  ItemIngredient[]
 
   @@unique([tenantId, name, deletedAt])
   @@index([tenantId])
   @@map("ingredients")
 }
 
-model DishIngredient {
+model ItemIngredient {
   id           String   @id @default(uuid()) @db.Uuid
-  dishId       String   @map("dish_id") @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  itemId       String   @map("item_id") @db.Uuid
   ingredientId String   @map("ingredient_id") @db.Uuid
   quantity     String?  @db.VarChar(50)
   unit         String?  @db.VarChar(50)
   isOptional   Boolean  @default(false) @map("is_optional")
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
 
-  // Relations
-  dish       Dish       @relation(fields: [dishId], references: [id], onDelete: Cascade)
+  item       Item       @relation(fields: [itemId], references: [id], onDelete: Cascade)
   ingredient Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
 
-  @@unique([dishId, ingredientId])
-  @@index([dishId])
+  @@unique([itemId, ingredientId])
+  @@index([itemId])
   @@index([ingredientId])
-  @@map("dish_ingredients")
+  @@map("item_ingredients")
+}
+
+// ============================================
+// ASSETS (Images, PDFs)
+// ============================================
+model Asset {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  kind        String   @default("image") @db.VarChar(20)
+  storageUrl  String   @map("storage_url")
+  contentType String?  @map("content_type") @db.VarChar(100)
+  widthPx     Int?     @map("width_px")
+  heightPx    Int?     @map("height_px")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  items  Item[]
+
+  @@map("assets")
 }
 
 // ============================================
@@ -137,6 +644,7 @@ model AdminUser {
   tenantId     String    @map("tenant_id") @db.Uuid
   username     String    @db.VarChar(100)
   email        String    @db.VarChar(255)
+  displayName  String?   @map("display_name") @db.VarChar(255)
   passwordHash String    @map("password_hash")
   role         String    @default("admin") @db.VarChar(50)
   isActive     Boolean   @default(true) @map("is_active")
@@ -145,7 +653,6 @@ model AdminUser {
   updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz
   deletedAt    DateTime? @map("deleted_at") @db.Timestamptz
 
-  // Relations
   tenant    Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   auditLogs AuditLog[]
 
@@ -170,7 +677,6 @@ model AuditLog {
   userAgent  String?  @map("user_agent")
   createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
 
-  // Relations
   tenant Tenant?    @relation(fields: [tenantId], references: [id], onDelete: SetNull)
   user   AdminUser? @relation(fields: [userId], references: [id], onDelete: SetNull)
 
@@ -191,7 +697,6 @@ model ChatSession {
   updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz
   expiresAt DateTime? @map("expires_at") @db.Timestamptz
 
-  // Relations
   tenant   Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   messages ChatMessage[]
 
@@ -210,7 +715,6 @@ model ChatMessage {
   tokenCount  Int?     @map("token_count")
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
 
-  // Relations
   session ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   @@index([sessionId])
@@ -221,19 +725,19 @@ model ChatMessage {
 // SUBSCRIPTION PLANS
 // ============================================
 model SubscriptionPlan {
-  id                  String    @id @default(uuid()) @db.Uuid
-  name                String    @db.VarChar(100)
-  description         String?
-  priceMonthly        Decimal   @map("price_monthly") @db.Decimal(10, 2)
-  priceYearly         Decimal   @map("price_yearly") @db.Decimal(10, 2)
-  maxMenuItems        Int       @default(100) @map("max_menu_items")
-  maxApiCallsMonthly  Int       @default(10000) @map("max_api_calls_monthly")
-  features            Json      @default("[]")
-  isActive            Boolean   @default(true) @map("is_active")
-  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt           DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  id                 String   @id @default(uuid()) @db.Uuid
+  name               String   @db.VarChar(100)
+  description        String?
+  priceMonthly       Decimal  @map("price_monthly") @db.Decimal(10, 2)
+  priceYearly        Decimal  @map("price_yearly") @db.Decimal(10, 2)
+  maxMenuItems       Int      @default(100) @map("max_menu_items")
+  maxLocations       Int      @default(1) @map("max_locations")
+  maxApiCallsMonthly Int      @default(10000) @map("max_api_calls_monthly")
+  features           Json     @default("[]")
+  isActive           Boolean  @default(true) @map("is_active")
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
-  // Relations
   subscriptions RestaurantSubscription[]
 
   @@map("subscription_plans")
@@ -266,7 +770,6 @@ model RestaurantSubscription {
   createdAt    DateTime           @default(now()) @map("created_at") @db.Timestamptz
   updatedAt    DateTime           @updatedAt @map("updated_at") @db.Timestamptz
 
-  // Relations
   restaurant Tenant           @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   plan       SubscriptionPlan @relation(fields: [planId], references: [id])
 
@@ -288,7 +791,6 @@ model UsageAnalytics {
   menuViews    Int      @default(0) @map("menu_views")
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
 
-  // Relations
   restaurant Tenant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
 
   @@unique([restaurantId, date])

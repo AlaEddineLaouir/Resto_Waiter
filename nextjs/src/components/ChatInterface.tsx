@@ -16,18 +16,31 @@ interface ChatInterfaceProps {
 // Category icons mapping
 const categoryIcons: Record<string, string> = {
   'antipasti': '🥗',
+  'appetizers': '🥗',
+  'starters': '🥗',
   'insalate': '🥗',
+  'salads': '🥗',
   'zuppe': '🍲',
+  'soups': '🍲',
   'pasta': '🍝',
   'risotto': '🍚',
   'pizza': '🍕',
   'pesce': '🐟',
+  'fish': '🐟',
+  'seafood': '🐟',
   'carne': '🥩',
+  'meat': '🥩',
+  'main dishes': '🍽️',
+  'main courses': '🍽️',
+  'mains': '🍽️',
   'contorni': '🥦',
+  'sides': '🥦',
   'dolci': '🍰',
   'dessert': '🍰',
+  'desserts': '🍰',
   'soft drinks': '🥤',
   'drinks': '🥤',
+  'beverages': '🍹',
   'mocktails': '🍹',
   'caffè': '☕',
   'coffee': '☕',
@@ -129,16 +142,18 @@ function formatContent(content: string): React.ReactNode {
     }
 
     // Handle category headers with emoji markers (🏷️ Category or 🍕 PIZZA)
-    if (trimmedLine.match(/^[🏷️🍕🍝🥗🍲🐟🥩🥦🍰🥤🍹☕🍽️🥃🍷]\s*.+$/)) {
+    // Use alternation instead of character class for multi-byte emoji support
+    const emojiPrefixPattern = /^(🏷️|🍕|🍝|🥗|🍲|🐟|🥩|🥦|🍰|🥤|🍹|☕|🍽️|🥃|🍷)\s*.+$/u;
+    if (trimmedLine.match(emojiPrefixPattern)) {
       flushParagraph();
-      const headerText = trimmedLine.replace(/^[🏷️🍕🍝🥗🍲🐟🥩🥦🍰🥤🍹☕🍽️🥃🍷]\s*/, '');
+      const headerText = trimmedLine.replace(/^(🏷️|🍕|🍝|🥗|🍲|🐟|🥩|🥦|🍰|🥤|🍹|☕|🍽️|🥃|🍷)\s*/u, '');
       elements.push(
         <div key={`cat-${idx}`} className="mt-6 mb-4">
-          <div className="flex items-center gap-3 bg-gradient-to-r from-red-50 to-amber-50 p-3 rounded-xl border border-red-100">
-            <div className="w-10 h-10 bg-gradient-to-br from-red-500 to-amber-500 rounded-xl flex items-center justify-center shadow-md">
-              <span className="text-xl">{getCategoryIcon(headerText)}</span>
+          <div className="flex items-center gap-3 bg-gradient-to-r from-orange-50 via-amber-50 to-yellow-50 p-4 rounded-2xl border border-orange-200 shadow-sm">
+            <div className="w-12 h-12 bg-gradient-to-br from-orange-400 via-amber-500 to-yellow-500 rounded-2xl flex items-center justify-center shadow-lg">
+              <span className="text-2xl">{getCategoryIcon(headerText)}</span>
             </div>
-            <h2 className="font-bold text-gray-900 text-xl">{headerText}</h2>
+            <h2 className="font-bold text-gray-800 text-xl uppercase tracking-wide">{headerText}</h2>
           </div>
         </div>
       );
@@ -151,11 +166,11 @@ function formatContent(content: string): React.ReactNode {
       const headerText = line.slice(1, -1);
       elements.push(
         <div key={`section-${idx}`} className="mt-6 mb-4">
-          <div className="flex items-center gap-3 bg-gradient-to-r from-red-50 to-amber-50 p-3 rounded-xl border border-red-100">
-            <div className="w-10 h-10 bg-gradient-to-br from-red-500 to-amber-500 rounded-xl flex items-center justify-center shadow-md">
-              <span className="text-xl">{getCategoryIcon(headerText)}</span>
+          <div className="flex items-center gap-3 bg-gradient-to-r from-orange-50 via-amber-50 to-yellow-50 p-4 rounded-2xl border border-orange-200 shadow-sm">
+            <div className="w-12 h-12 bg-gradient-to-br from-orange-400 via-amber-500 to-yellow-500 rounded-2xl flex items-center justify-center shadow-lg">
+              <span className="text-2xl">{getCategoryIcon(headerText)}</span>
             </div>
-            <h2 className="font-bold text-gray-900 text-xl">{headerText}</h2>
+            <h2 className="font-bold text-gray-800 text-xl uppercase tracking-wide">{headerText}</h2>
           </div>
         </div>
       );
@@ -163,16 +178,22 @@ function formatContent(content: string): React.ReactNode {
     }
     
     // Handle plain category headers (line with just a category name)
-    const categoryNames = ['Antipasti', 'Insalate', 'Zuppe', 'Pasta', 'Risotto', 'Pizza', 'Pesce', 'Carne', 'Contorni', 'Dolci', 'Soft Drinks', 'Mocktails', 'Caffè e Digestivi', 'Caffè'];
-    if (categoryNames.some(cat => trimmedLine === cat || trimmedLine.toUpperCase() === cat.toUpperCase())) {
+    const categoryNames = [
+      'Antipasti', 'Appetizers', 'Starters', 'Insalate', 'Salads', 'Zuppe', 'Soups',
+      'Pasta', 'Risotto', 'Pizza', 'Pesce', 'Fish', 'Seafood', 'Carne', 'Meat',
+      'Main Dishes', 'Main Courses', 'Mains', 'Contorni', 'Sides',
+      'Dolci', 'Dessert', 'Desserts', 'Soft Drinks', 'Drinks', 'Beverages', 'Mocktails',
+      'Caffè e Digestivi', 'Caffè', 'Coffee'
+    ];
+    if (categoryNames.some(cat => trimmedLine.toLowerCase() === cat.toLowerCase())) {
       flushParagraph();
       elements.push(
         <div key={`plaincat-${idx}`} className="mt-6 mb-4">
-          <div className="flex items-center gap-3 bg-gradient-to-r from-red-50 to-amber-50 p-3 rounded-xl border border-red-100">
-            <div className="w-10 h-10 bg-gradient-to-br from-red-500 to-amber-500 rounded-xl flex items-center justify-center shadow-md">
-              <span className="text-xl">{getCategoryIcon(trimmedLine)}</span>
+          <div className="flex items-center gap-3 bg-gradient-to-r from-orange-50 via-amber-50 to-yellow-50 p-4 rounded-2xl border border-orange-200 shadow-sm">
+            <div className="w-12 h-12 bg-gradient-to-br from-orange-400 via-amber-500 to-yellow-500 rounded-2xl flex items-center justify-center shadow-lg">
+              <span className="text-2xl">{getCategoryIcon(trimmedLine)}</span>
             </div>
-            <h2 className="font-bold text-gray-900 text-xl">{trimmedLine}</h2>
+            <h2 className="font-bold text-gray-800 text-xl uppercase tracking-wide">{trimmedLine}</h2>
           </div>
         </div>
       );
@@ -382,6 +403,7 @@ function formatInlineText(text: string): React.ReactNode {
 export default function ChatInterface({ tenantId, restaurantName = 'Restaurant' }: ChatInterfaceProps) {
   const [mounted, setMounted] = useState(false);
   const [inputValue, setInputValue] = useState('');
+  const [sessionId, setSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([
     {
       id: 'welcome',
@@ -426,11 +448,18 @@ export default function ChatInterface({ tenantId, restaurantName = 'Restaurant' 
             content: m.content,
           })),
           tenantId,
+          sessionId,
         }),
       });
 
       if (!response.ok) {
         throw new Error('Failed to get response');
+      }
+
+      // Get session ID from response headers (for new sessions)
+      const newSessionId = response.headers.get('X-Session-Id');
+      if (newSessionId && !sessionId) {
+        setSessionId(newSessionId);
       }
 
       const reader = response.body?.getReader();
@@ -441,7 +470,8 @@ export default function ChatInterface({ tenantId, restaurantName = 'Restaurant' 
         role: 'assistant',
         content: '',
       };
-      setMessages((prev) => [...prev, assistantMessage]);
+      // Don't add empty message yet - wait for first content
+      let messageAdded = false;
 
       const decoder = new TextDecoder();
       let buffer = '';
@@ -464,25 +494,41 @@ export default function ChatInterface({ tenantId, restaurantName = 'Restaurant' 
               const content = parsed.choices?.[0]?.delta?.content;
               if (content) {
                 assistantMessage.content += content;
-                setMessages((prev) =>
-                  prev.map((m) =>
-                    m.id === assistantMessage.id ? { ...m, content: assistantMessage.content } : m
-                  )
-                );
+                if (!messageAdded) {
+                  // Add message on first content
+                  setMessages((prev) => [...prev, { ...assistantMessage }]);
+                  messageAdded = true;
+                } else {
+                  setMessages((prev) =>
+                    prev.map((m) =>
+                      m.id === assistantMessage.id ? { ...m, content: assistantMessage.content } : m
+                    )
+                  );
+                }
               }
             } catch {
               // Not JSON, might be plain text
               if (data && data !== '[DONE]') {
                 assistantMessage.content += data;
-                setMessages((prev) =>
-                  prev.map((m) =>
-                    m.id === assistantMessage.id ? { ...m, content: assistantMessage.content } : m
-                  )
-                );
+                if (!messageAdded) {
+                  setMessages((prev) => [...prev, { ...assistantMessage }]);
+                  messageAdded = true;
+                } else {
+                  setMessages((prev) =>
+                    prev.map((m) =>
+                      m.id === assistantMessage.id ? { ...m, content: assistantMessage.content } : m
+                    )
+                  );
+                }
               }
             }
           }
         }
+      }
+      
+      // If no content was received, show error
+      if (!messageAdded || !assistantMessage.content) {
+        throw new Error('No response received from AI');
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');

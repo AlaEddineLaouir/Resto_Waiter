@@ -1,7 +1,8 @@
 /**
  * MCP Tools for Restaurant Menu
  * 
- * Tools for querying menu data, dishes, and ingredients
+ * Tools for querying menu data using the new multi-tenant schema
+ * with sections, items, allergens, and dietary flags
  */
 
 import { prisma } from '@/lib/prisma';
@@ -13,20 +14,24 @@ export interface ToolResult {
 // Tool definitions for AI SDK
 export const menuTools = {
   get_menu: {
-    description: 'Get the full restaurant menu with all categories and dishes',
+    description: 'Get the full restaurant menu with all sections and items from the currently published version',
     parameters: {
       type: 'object' as const,
       properties: {
         tenantId: {
           type: 'string',
           description: 'The restaurant tenant ID',
+        },
+        locale: {
+          type: 'string',
+          description: 'The locale for translations (e.g., en-US, fr-FR). Defaults to en-US',
         },
       },
       required: ['tenantId'],
     },
   },
-  get_dish_details: {
-    description: 'Get detailed information about a specific dish including ingredients and allergens',
+  get_item_details: {
+    description: 'Get detailed information about a specific menu item including ingredients, allergens, and dietary flags',
     parameters: {
       type: 'object' as const,
       properties: {
@@ -34,16 +39,20 @@ export const menuTools = {
           type: 'string',
           description: 'The restaurant tenant ID',
         },
-        dishName: {
+        itemName: {
           type: 'string',
-          description: 'The name of the dish to look up',
+          description: 'The name of the item to look up',
+        },
+        locale: {
+          type: 'string',
+          description: 'The locale for translations. Defaults to en-US',
         },
       },
-      required: ['tenantId', 'dishName'],
+      required: ['tenantId', 'itemName'],
     },
   },
-  search_dishes: {
-    description: 'Search for dishes by name, ingredient, or dietary preference',
+  search_items: {
+    description: 'Search for menu items by name, ingredient, allergen, or dietary preference',
     parameters: {
       type: 'object' as const,
       properties: {
@@ -53,14 +62,18 @@ export const menuTools = {
         },
         query: {
           type: 'string',
-          description: 'Search query (dish name, ingredient, or dietary preference like vegetarian)',
+          description: 'Search query (item name, ingredient, dietary flag like vegetarian/vegan, or allergen)',
+        },
+        locale: {
+          type: 'string',
+          description: 'The locale for translations. Defaults to en-US',
         },
       },
       required: ['tenantId', 'query'],
     },
   },
   get_recommendations: {
-    description: 'Get dish recommendations based on preferences or popular items',
+    description: 'Get menu item recommendations based on preferences, dietary restrictions, or allergen exclusions',
     parameters: {
       type: 'object' as const,
       properties: {
@@ -70,55 +83,182 @@ export const menuTools = {
         },
         preference: {
           type: 'string',
-          description: 'Optional preference like "vegetarian", "healthy"',
+          description: 'Optional preference like "vegetarian", "vegan", "gluten-free"',
+        },
+        excludeAllergens: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Optional list of allergen codes to exclude (e.g., ["gluten", "nuts"])',
+        },
+        locale: {
+          type: 'string',
+          description: 'The locale for translations. Defaults to en-US',
         },
       },
       required: ['tenantId'],
     },
   },
+  list_allergens: {
+    description: 'List all known allergens with their localized names',
+    parameters: {
+      type: 'object' as const,
+      properties: {
+        locale: {
+          type: 'string',
+          description: 'The locale for translations. Defaults to en-US',
+        },
+      },
+      required: [],
+    },
+  },
+  list_dietary_flags: {
+    description: 'List all dietary flags (vegetarian, vegan, halal, kosher, etc.) with their localized names',
+    parameters: {
+      type: 'object' as const,
+      properties: {
+        locale: {
+          type: 'string',
+          description: 'The locale for translations. Defaults to en-US',
+        },
+      },
+      required: [],
+    },
+  },
 };
 
+// Helper to get translation
+function getTranslation<T extends { locale: string }>(
+  translations: T[],
+  locale: string,
+  fallback: string = 'en-US'
+): T | undefined {
+  return (
+    translations.find((t) => t.locale === locale) ||
+    translations.find((t) => t.locale === fallback) ||
+    translations[0]
+  );
+}
+
 // Tool execution functions
-export async function executeGetMenu(tenantId: string): Promise<ToolResult> {
-  const categories = await prisma.category.findMany({
-    where: { tenantId },
+export async function executeGetMenu(
+  tenantId: string,
+  locale: string = 'en-US'
+): Promise<ToolResult> {
+  // Find published menus with their menu lines
+  const menus = await prisma.menu.findMany({
+    where: { 
+      tenantId,
+      status: 'published',
+    },
     include: {
-      dishes: {
-        where: { isAvailable: true },
-        orderBy: { name: 'asc' },
+      translations: true,
+      lines: {
+        where: { isEnabled: true },
+        orderBy: { displayOrder: 'asc' },
+        include: {
+          section: {
+            include: {
+              translations: true,
+            },
+          },
+          item: {
+            include: {
+              translations: true,
+              priceBase: true,
+              allergens: {
+                include: { allergen: { include: { translations: true } } },
+              },
+              dietaryFlags: {
+                include: { dietaryFlag: { include: { translations: true } } },
+              },
+            },
+          },
+        },
       },
     },
-    orderBy: { displayOrder: 'asc' },
   });
 
-  if (categories.length === 0) {
+  if (menus.length === 0) {
     return {
-      content: [{ type: 'text', text: 'No menu items found for this restaurant.' }],
+      content: [{ type: 'text', text: 'No published menus found for this restaurant.' }],
     };
   }
 
   let menuText = '# Restaurant Menu\n\n';
-  for (const category of categories) {
-    menuText += `## ${category.name}\n`;
-    if (category.description) {
-      menuText += `${category.description}\n`;
-    }
-    menuText += '\n';
 
-    for (const dish of category.dishes) {
-      menuText += `### ${dish.name} - €${Number(dish.price).toFixed(2)}\n`;
-      if (dish.description) {
-        menuText += `${dish.description}\n`;
-      }
-      const tags: string[] = [];
-      if (dish.isVegetarian) tags.push('🥬 Vegetarian');
-      if (dish.allergens && dish.allergens.length > 0) {
-        tags.push(`⚠️ Contains: ${dish.allergens.join(', ')}`);
-      }
-      if (tags.length > 0) {
-        menuText += `${tags.join(' | ')}\n`;
+  for (const menu of menus) {
+    const menuTrans = getTranslation(menu.translations, locale);
+
+    menuText += `## ${menuTrans?.name || menu.code}\n\n`;
+
+    // Get section lines (top-level lines with lineType='section')
+    // Filter by: line is enabled, section exists, section is active
+    const sectionLines = menu.lines.filter(
+      (l) => l.lineType === 'section' && l.isEnabled && l.section && l.section.isActive
+    );
+
+    for (const sectionLine of sectionLines) {
+      const section = sectionLine.section!;
+      const sectionTrans = getTranslation(section.translations, locale);
+      
+      menuText += `### ${sectionTrans?.title || 'Section'}\n`;
+      if (sectionTrans?.description) {
+        menuText += `${sectionTrans.description}\n`;
       }
       menuText += '\n';
+
+      // Get item lines that are children of this section line
+      // Filter by: line is enabled, item exists, item is visible
+      const itemLines = menu.lines.filter(
+        (l) => l.lineType === 'item' && l.isEnabled && l.parentLineId === sectionLine.id && l.item && l.item.isVisible
+      );
+
+      // Skip sections with no visible items
+      if (itemLines.length === 0) {
+        // Remove the section header we just added
+        const lastSectionIndex = menuText.lastIndexOf(`### ${sectionTrans?.title || 'Section'}`);
+        if (lastSectionIndex > 0) {
+          menuText = menuText.substring(0, lastSectionIndex);
+        }
+        continue;
+      }
+
+      for (const itemLine of itemLines) {
+        const item = itemLine.item!;
+        const itemTrans = getTranslation(item.translations, locale);
+        const price = item.priceBase
+          ? `€${(Number(item.priceBase.amountMinor) / 100).toFixed(2)}`
+          : '';
+
+        menuText += `**${itemTrans?.name || 'Item'}** ${price}\n`;
+        if (itemTrans?.description) {
+          menuText += `${itemTrans.description}\n`;
+        }
+
+        const tags: string[] = [];
+        for (const df of item.dietaryFlags) {
+          const dfTrans = getTranslation(df.dietaryFlag.translations, locale);
+          tags.push(`🏷️ ${dfTrans?.name || df.dietaryFlag.code}`);
+        }
+        if (item.allergens.length > 0) {
+          const allergenNames = item.allergens.map((a) => {
+            const aTrans = getTranslation(a.allergen.translations, locale);
+            return aTrans?.name || a.allergen.code;
+          });
+          tags.push(`⚠️ Allergens: ${allergenNames.join(', ')}`);
+        }
+        if (item.spicinessLevel && item.spicinessLevel > 0) {
+          tags.push(`🌶️ Spiciness: ${'🔥'.repeat(item.spicinessLevel)}`);
+        }
+        if (item.calories) {
+          tags.push(`📊 ${item.calories} cal`);
+        }
+
+        if (tags.length > 0) {
+          menuText += `${tags.join(' | ')}\n`;
+        }
+        menuText += '\n';
+      }
     }
   }
 
@@ -127,140 +267,303 @@ export async function executeGetMenu(tenantId: string): Promise<ToolResult> {
   };
 }
 
-export async function executeGetDishDetails(
+export async function executeGetItemDetails(
   tenantId: string,
-  dishName: string
+  itemName: string,
+  locale: string = 'en-US'
 ): Promise<ToolResult> {
-  const dish = await prisma.dish.findFirst({
+  // Search for item by name in translations, only if it has an enabled menu line
+  const items = await prisma.item.findMany({
     where: {
       tenantId,
-      name: { contains: dishName, mode: 'insensitive' },
-    },
-    include: {
-      category: true,
-      ingredients: {
-        include: { ingredient: true },
+      isVisible: true,
+      translations: {
+        some: {
+          name: { contains: itemName, mode: 'insensitive' },
+        },
+      },
+      // Only get items that have an enabled menu line in a published menu
+      // AND whose parent section line is also enabled
+      menuLines: {
+        some: {
+          isEnabled: true,
+          menu: { status: 'published' },
+          parentLine: { isEnabled: true },
+        },
       },
     },
+    include: {
+      translations: true,
+      priceBase: true,
+      section: {
+        include: {
+          translations: true,
+        },
+      },
+      ingredients: {
+        include: {
+          ingredient: true,
+        },
+      },
+      allergens: {
+        include: {
+          allergen: { include: { translations: true } },
+        },
+      },
+      dietaryFlags: {
+        include: {
+          dietaryFlag: { include: { translations: true } },
+        },
+      },
+      optionGroups: {
+        include: {
+          optionGroup: {
+            include: {
+              translations: true,
+              options: {
+                include: {
+                  translations: true,
+                  price: true,
+                },
+              },
+            },
+          },
+        },
+      },
+      menuItems: {
+        where: { menu: { status: 'published' } },
+        take: 1,
+        include: {
+          menu: {
+            include: {
+              translations: true,
+            },
+          },
+        },
+      },
+    },
+    take: 1,
   });
 
-  if (!dish) {
+  if (items.length === 0) {
     return {
-      content: [{ type: 'text', text: `No dish found matching "${dishName}".` }],
+      content: [{ type: 'text', text: `No item found matching "${itemName}".` }],
     };
   }
 
-  let detailsText = `# ${dish.name}\n\n`;
-  detailsText += `**Category:** ${dish.category.name}\n`;
-  detailsText += `**Price:** €${Number(dish.price).toFixed(2)}\n\n`;
+  const item = items[0];
+  const itemTrans = getTranslation(item.translations, locale);
+  const sectionTrans = getTranslation(item.section.translations, locale);
+  const menuItem = item.menuItems[0];
+  const menuTrans = menuItem ? getTranslation(menuItem.menu.translations, locale) : null;
 
-  if (dish.description) {
-    detailsText += `${dish.description}\n\n`;
+  let detailsText = `# ${itemTrans?.name || 'Item'}\n\n`;
+  detailsText += `**Menu:** ${menuTrans?.name || menuItem?.menu.code || 'Unknown'}\n`;
+  detailsText += `**Section:** ${sectionTrans?.title || 'Section'}\n`;
+
+  if (item.priceBase) {
+    const price = (Number(item.priceBase.amountMinor) / 100).toFixed(2);
+    detailsText += `**Price:** €${price}\n`;
   }
 
-  // Dietary info
-  const dietary: string[] = [];
-  if (dish.isVegetarian) dietary.push('Vegetarian');
-  if (dietary.length > 0) {
-    detailsText += `**Dietary:** ${dietary.join(', ')}\n\n`;
+  detailsText += '\n';
+
+  if (itemTrans?.description) {
+    detailsText += `${itemTrans.description}\n\n`;
+  }
+
+  // Dietary flags
+  if (item.dietaryFlags.length > 0) {
+    const flags = item.dietaryFlags.map((df) => {
+      const trans = getTranslation(df.dietaryFlag.translations, locale);
+      return trans?.name || df.dietaryFlag.code;
+    });
+    detailsText += `**Dietary:** ${flags.join(', ')}\n\n`;
   }
 
   // Allergens
-  if (dish.allergens && dish.allergens.length > 0) {
-    detailsText += `**Allergens:** ${dish.allergens.join(', ')}\n\n`;
+  if (item.allergens.length > 0) {
+    const allergens = item.allergens.map((a) => {
+      const trans = getTranslation(a.allergen.translations, locale);
+      return trans?.name || a.allergen.code;
+    });
+    detailsText += `**Allergens:** ${allergens.join(', ')}\n\n`;
   }
 
   // Ingredients
-  if (dish.ingredients.length > 0) {
+  if (item.ingredients.length > 0) {
     detailsText += '**Ingredients:**\n';
-    for (const di of dish.ingredients) {
-      detailsText += `- ${di.ingredient.name}`;
-      if (di.ingredient.isAllergen) {
-        detailsText += ' ⚠️ (Allergen)';
+    for (const ii of item.ingredients) {
+      detailsText += `- ${ii.ingredient.name}`;
+      if (!ii.isOptional) {
+        detailsText += ' (main)';
       }
       detailsText += '\n';
     }
+    detailsText += '\n';
+  }
+
+  // Nutritional info
+  if (item.calories || item.spicinessLevel) {
+    detailsText += '**Nutritional Info:**\n';
+    if (item.calories) detailsText += `- Calories: ${item.calories}\n`;
+    if (item.spicinessLevel) detailsText += `- Spiciness: ${item.spicinessLevel}/5\n`;
+    detailsText += '\n';
+  }
+
+  // Option groups (customizations)
+  if (item.optionGroups.length > 0) {
+    detailsText += '**Customizations:**\n';
+    for (const iog of item.optionGroups) {
+      const ogTrans = getTranslation(iog.optionGroup.translations, locale);
+      detailsText += `- *${ogTrans?.name || 'Options'}*`;
+      if (iog.optionGroup.minSelect > 0) {
+        detailsText += ` (required, pick ${iog.optionGroup.minSelect}-${iog.optionGroup.maxSelect})`;
+      }
+      detailsText += ':\n';
+      for (const oi of iog.optionGroup.options) {
+        const oiTrans = getTranslation(oi.translations, locale);
+        const price = oi.price
+          ? ` +€${(Number(oi.price.deltaMinor) / 100).toFixed(2)}`
+          : '';
+        detailsText += `  - ${oiTrans?.name || 'Option'}${price}\n`;
+      }
+    }
+    detailsText += '\n';
   }
 
   // Availability
-  detailsText += `\n**Available:** ${dish.isAvailable ? 'Yes' : 'Currently Unavailable'}\n`;
+  detailsText += `**Available:** ${item.isVisible ? 'Yes' : 'Currently Unavailable'}\n`;
 
   return {
     content: [{ type: 'text', text: detailsText }],
   };
 }
 
-export async function executeSearchDishes(
+export async function executeSearchItems(
   tenantId: string,
-  query: string
+  query: string,
+  locale: string = 'en-US'
 ): Promise<ToolResult> {
   const lowerQuery = query.toLowerCase();
 
   // Check for dietary preferences
-  const isVegetarianSearch = lowerQuery.includes('vegetarian');
+  const dietaryKeywords = ['vegetarian', 'vegan', 'halal', 'kosher', 'gluten-free', 'gluten free'];
+  const dietaryMatch = dietaryKeywords.find((k) => lowerQuery.includes(k));
 
-  interface DishWhereInput {
-    tenantId: string;
-    isAvailable: boolean;
-    OR?: Array<{
-      name?: { contains: string; mode: 'insensitive' };
-      description?: { contains: string; mode: 'insensitive' };
-      ingredients?: { some: { ingredient: { name: { contains: string; mode: 'insensitive' } } } };
-    }>;
-    isVegetarian?: boolean;
-  }
+  // Check for allergen exclusion patterns
+  const allergenExclusionMatch = lowerQuery.match(/without\s+(\w+)|no\s+(\w+)|free\s+from\s+(\w+)/);
 
-  const whereClause: DishWhereInput = {
-    tenantId,
-    isAvailable: true,
-  };
+  let items;
 
-  if (!isVegetarianSearch) {
-    whereClause.OR = [
-      { name: { contains: query, mode: 'insensitive' } },
-      { description: { contains: query, mode: 'insensitive' } },
-      {
-        ingredients: {
+  if (dietaryMatch) {
+    // Search by dietary flag
+    const code = dietaryMatch.replace(' ', '-').replace('free', '-free');
+    items = await prisma.item.findMany({
+      where: {
+        tenantId,
+        isVisible: true,
+        menuLines: { some: { isEnabled: true, menu: { status: 'published' }, parentLine: { isEnabled: true } } },
+        dietaryFlags: {
           some: {
-            ingredient: { name: { contains: query, mode: 'insensitive' } },
+            dietaryFlag: { code: { contains: code, mode: 'insensitive' } },
           },
         },
       },
-    ];
+      include: {
+        translations: true,
+        priceBase: true,
+        section: { include: { translations: true } },
+        dietaryFlags: { include: { dietaryFlag: { include: { translations: true } } } },
+        allergens: { include: { allergen: { include: { translations: true } } } },
+      },
+      take: 10,
+    });
+  } else if (allergenExclusionMatch) {
+    // Search excluding specific allergen
+    const excludeAllergen = allergenExclusionMatch[1] || allergenExclusionMatch[2] || allergenExclusionMatch[3];
+    items = await prisma.item.findMany({
+      where: {
+        tenantId,
+        isVisible: true,
+        menuLines: { some: { isEnabled: true, menu: { status: 'published' }, parentLine: { isEnabled: true } } },
+        NOT: {
+          allergens: {
+            some: {
+              allergen: { code: { contains: excludeAllergen, mode: 'insensitive' } },
+            },
+          },
+        },
+      },
+      include: {
+        translations: true,
+        priceBase: true,
+        section: { include: { translations: true } },
+        dietaryFlags: { include: { dietaryFlag: { include: { translations: true } } } },
+        allergens: { include: { allergen: { include: { translations: true } } } },
+      },
+      take: 10,
+    });
+  } else {
+    // General search by name, description, or ingredient
+    items = await prisma.item.findMany({
+      where: {
+        tenantId,
+        isVisible: true,
+        menuLines: { some: { isEnabled: true, menu: { status: 'published' }, parentLine: { isEnabled: true } } },
+        OR: [
+          { translations: { some: { name: { contains: query, mode: 'insensitive' } } } },
+          { translations: { some: { description: { contains: query, mode: 'insensitive' } } } },
+          { ingredients: { some: { ingredient: { name: { contains: query, mode: 'insensitive' } } } } },
+        ],
+      },
+      include: {
+        translations: true,
+        priceBase: true,
+        section: { include: { translations: true } },
+        dietaryFlags: { include: { dietaryFlag: { include: { translations: true } } } },
+        allergens: { include: { allergen: { include: { translations: true } } } },
+      },
+      take: 10,
+    });
   }
 
-  if (isVegetarianSearch) {
-    whereClause.isVegetarian = true;
-  }
-
-  const dishes = await prisma.dish.findMany({
-    where: whereClause,
-    include: {
-      category: true,
-    },
-    take: 10,
-  });
-
-  if (dishes.length === 0) {
+  if (items.length === 0) {
     return {
-      content: [{ type: 'text', text: `No dishes found matching "${query}".` }],
+      content: [{ type: 'text', text: `No items found matching "${query}".` }],
     };
   }
 
   let resultsText = `# Search Results for "${query}"\n\n`;
-  resultsText += `Found ${dishes.length} dish${dishes.length > 1 ? 'es' : ''}:\n\n`;
+  resultsText += `Found ${items.length} item${items.length > 1 ? 's' : ''}:\n\n`;
 
-  for (const dish of dishes) {
-    resultsText += `### ${dish.name} - €${Number(dish.price).toFixed(2)}\n`;
-    resultsText += `*${dish.category.name}*\n`;
-    if (dish.description) {
-      resultsText += `${dish.description}\n`;
+  for (const item of items) {
+    const itemTrans = getTranslation(item.translations, locale);
+    const sectionTrans = getTranslation(item.section.translations, locale);
+    const price = item.priceBase
+      ? `€${(Number(item.priceBase.amountMinor) / 100).toFixed(2)}`
+      : '';
+
+    resultsText += `### ${itemTrans?.name || 'Item'} ${price}\n`;
+    resultsText += `*${sectionTrans?.title || 'Section'}*\n`;
+
+    if (itemTrans?.description) {
+      resultsText += `${itemTrans.description}\n`;
     }
+
     const tags: string[] = [];
-    if (dish.isVegetarian) tags.push('🥬 Vegetarian');
-    if (dish.allergens && dish.allergens.length > 0) {
-      tags.push(`⚠️ ${dish.allergens.join(', ')}`);
+    for (const df of item.dietaryFlags) {
+      const dfTrans = getTranslation(df.dietaryFlag.translations, locale);
+      tags.push(`🏷️ ${dfTrans?.name || df.dietaryFlag.code}`);
     }
+    if (item.allergens.length > 0) {
+      const allergenNames = item.allergens.map((a) => {
+        const aTrans = getTranslation(a.allergen.translations, locale);
+        return aTrans?.name || a.allergen.code;
+      });
+      resultsText += `⚠️ ${allergenNames.join(', ')}\n`;
+    }
+
     if (tags.length > 0) {
       resultsText += `${tags.join(' | ')}\n`;
     }
@@ -274,54 +577,89 @@ export async function executeSearchDishes(
 
 export async function executeGetRecommendations(
   tenantId: string,
-  preference?: string
+  preference?: string,
+  excludeAllergens?: string[],
+  locale: string = 'en-US'
 ): Promise<ToolResult> {
-  interface RecommendWhereInput {
-    tenantId: string;
-    isAvailable: boolean;
-    isVegetarian?: boolean;
-  }
-
-  const whereClause: RecommendWhereInput = {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const whereClause: any = {
     tenantId,
-    isAvailable: true,
+    isVisible: true,
+    menuLines: { some: { isEnabled: true, menu: { status: 'published' }, parentLine: { isEnabled: true } } },
   };
 
   if (preference) {
     const lowerPref = preference.toLowerCase();
-    if (lowerPref.includes('healthy') || lowerPref.includes('light') || lowerPref.includes('vegetarian')) {
-      whereClause.isVegetarian = true;
+    if (
+      lowerPref.includes('vegetarian') ||
+      lowerPref.includes('vegan') ||
+      lowerPref.includes('halal') ||
+      lowerPref.includes('kosher')
+    ) {
+      whereClause.dietaryFlags = {
+        some: {
+          dietaryFlag: { code: { contains: lowerPref.replace(' ', '-'), mode: 'insensitive' } },
+        },
+      };
     }
   }
 
-  const dishes = await prisma.dish.findMany({
-    where: whereClause,
-    include: {
-      category: true,
-    },
-    take: 5,
-    orderBy: { displayOrder: 'asc' },
-  });
-
-  if (dishes.length === 0) {
-    return {
-      content: [{ type: 'text', text: 'No recommendations available at this time.' }],
+  if (excludeAllergens && excludeAllergens.length > 0) {
+    whereClause.NOT = {
+      allergens: {
+        some: {
+          allergen: { code: { in: excludeAllergens.map((a) => a.toLowerCase()) } },
+        },
+      },
     };
   }
 
-  let recText = '# Recommended Dishes\n\n';
+  const items = await prisma.item.findMany({
+    where: whereClause,
+    include: {
+      translations: true,
+      priceBase: true,
+      section: { include: { translations: true } },
+      dietaryFlags: { include: { dietaryFlag: { include: { translations: true } } } },
+      allergens: { include: { allergen: { include: { translations: true } } } },
+    },
+    take: 5,
+  });
+
+  if (items.length === 0) {
+    return {
+      content: [{ type: 'text', text: 'No recommendations available based on your criteria.' }],
+    };
+  }
+
+  let recText = '# Recommended Items\n\n';
   if (preference) {
     recText += `Based on your preference for "${preference}":\n\n`;
   }
+  if (excludeAllergens && excludeAllergens.length > 0) {
+    recText += `Excluding allergens: ${excludeAllergens.join(', ')}\n\n`;
+  }
 
-  for (const dish of dishes) {
-    recText += `### ${dish.name} - €${Number(dish.price).toFixed(2)}\n`;
-    recText += `*${dish.category.name}*\n`;
-    if (dish.description) {
-      recText += `${dish.description}\n`;
+  for (const item of items) {
+    const itemTrans = getTranslation(item.translations, locale);
+    const sectionTrans = getTranslation(item.section.translations, locale);
+    const price = item.priceBase
+      ? `€${(Number(item.priceBase.amountMinor) / 100).toFixed(2)}`
+      : '';
+
+    recText += `### ${itemTrans?.name || 'Item'} ${price}\n`;
+    recText += `*${sectionTrans?.title || 'Section'}*\n`;
+
+    if (itemTrans?.description) {
+      recText += `${itemTrans.description}\n`;
     }
+
     const tags: string[] = [];
-    if (dish.isVegetarian) tags.push('🥬 Vegetarian');
+    for (const df of item.dietaryFlags) {
+      const dfTrans = getTranslation(df.dietaryFlag.translations, locale);
+      tags.push(`🏷️ ${dfTrans?.name || df.dietaryFlag.code}`);
+    }
+
     if (tags.length > 0) {
       recText += `${tags.join(' | ')}\n`;
     }
@@ -333,28 +671,101 @@ export async function executeGetRecommendations(
   };
 }
 
+export async function executeListAllergens(locale: string = 'en-US'): Promise<ToolResult> {
+  const allergens = await prisma.allergen.findMany({
+    include: { translations: true },
+    orderBy: { code: 'asc' },
+  });
+
+  if (allergens.length === 0) {
+    return {
+      content: [{ type: 'text', text: 'No allergens defined in the system.' }],
+    };
+  }
+
+  let text = '# Known Allergens\n\n';
+  text += 'These are the standard allergens tracked in our menu system:\n\n';
+
+  for (const allergen of allergens) {
+    const trans = getTranslation(allergen.translations, locale);
+    text += `- **${trans?.name || allergen.code}** (${allergen.code})\n`;
+  }
+
+  return {
+    content: [{ type: 'text', text }],
+  };
+}
+
+export async function executeListDietaryFlags(locale: string = 'en-US'): Promise<ToolResult> {
+  const flags = await prisma.dietaryFlag.findMany({
+    include: { translations: true },
+    orderBy: { code: 'asc' },
+  });
+
+  if (flags.length === 0) {
+    return {
+      content: [{ type: 'text', text: 'No dietary flags defined in the system.' }],
+    };
+  }
+
+  let text = '# Dietary Flags\n\n';
+  text += 'These dietary preferences and restrictions are supported:\n\n';
+
+  for (const flag of flags) {
+    const trans = getTranslation(flag.translations, locale);
+    text += `- **${trans?.name || flag.code}** (${flag.code})\n`;
+  }
+
+  return {
+    content: [{ type: 'text', text }],
+  };
+}
+
 // Combined tool executor
 export async function executeTool(
   toolName: string,
   args: Record<string, unknown>
 ): Promise<string> {
   const tenantId = args.tenantId as string;
+  const locale = (args.locale as string) || 'en-US';
 
   switch (toolName) {
     case 'get_menu': {
-      const result = await executeGetMenu(tenantId);
+      const result = await executeGetMenu(tenantId, locale);
       return result.content[0].text;
     }
-    case 'get_dish_details': {
-      const result = await executeGetDishDetails(tenantId, args.dishName as string);
+    case 'get_item_details': {
+      const result = await executeGetItemDetails(tenantId, args.itemName as string, locale);
       return result.content[0].text;
     }
-    case 'search_dishes': {
-      const result = await executeSearchDishes(tenantId, args.query as string);
+    case 'search_items': {
+      const result = await executeSearchItems(tenantId, args.query as string, locale);
       return result.content[0].text;
     }
     case 'get_recommendations': {
-      const result = await executeGetRecommendations(tenantId, args.preference as string);
+      const result = await executeGetRecommendations(
+        tenantId,
+        args.preference as string,
+        args.excludeAllergens as string[],
+        locale
+      );
+      return result.content[0].text;
+    }
+    case 'list_allergens': {
+      const result = await executeListAllergens(locale);
+      return result.content[0].text;
+    }
+    case 'list_dietary_flags': {
+      const result = await executeListDietaryFlags(locale);
+      return result.content[0].text;
+    }
+    // Backwards compatibility
+    case 'get_dish_details': {
+      const result = await executeGetItemDetails(tenantId, args.dishName as string, locale);
+      return result.content[0].text;
+    }
+    case 'search_dishes': {
+      const result = await executeSearchItems(tenantId, args.query as string, locale);
       return result.content[0].text;
     }
     default:

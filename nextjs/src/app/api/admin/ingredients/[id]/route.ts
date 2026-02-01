@@ -20,9 +20,13 @@ export async function GET(
         tenantId: session.tenantId,
       },
       include: {
-        dishes: {
+        items: {
           include: {
-            dish: { select: { id: true, name: true } },
+            item: { 
+              include: {
+                translations: { where: { locale: 'en-US' } }
+              }
+            },
           },
         },
       },
@@ -50,7 +54,7 @@ export async function PUT(
     }
 
     const { id } = await params;
-    const { name, allergenInfo, isAllergen } = await req.json();
+    const { name, allergenCode, isAllergen } = await req.json();
 
     // Verify ownership
     const existing = await prisma.ingredient.findFirst({
@@ -65,7 +69,7 @@ export async function PUT(
       where: { id },
       data: {
         ...(name !== undefined && { name }),
-        ...(allergenInfo !== undefined && { allergenInfo }),
+        ...(allergenCode !== undefined && { allergenCode }),
         ...(isAllergen !== undefined && { isAllergen }),
       },
     });
@@ -109,14 +113,14 @@ export async function DELETE(
       return NextResponse.json({ error: 'Ingredient not found' }, { status: 404 });
     }
 
-    // Check if used by any dishes
-    const usageCount = await prisma.dishIngredient.count({
+    // Check if used by any items
+    const usageCount = await prisma.itemIngredient.count({
       where: { ingredientId: id },
     });
 
     if (usageCount > 0) {
       return NextResponse.json(
-        { error: `Cannot delete ingredient. It is used by ${usageCount} dishes.` },
+        { error: `Cannot delete ingredient. It is used by ${usageCount} items.` },
         { status: 400 }
       );
     }

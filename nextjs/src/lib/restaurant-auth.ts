@@ -11,6 +11,7 @@ export interface RestaurantSession {
   id: string;
   email: string;
   tenantId: string;
+  tenantSlug: string;
   role: string;
 }
 

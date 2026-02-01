@@ -17,9 +17,10 @@ export async function GET() {
 
     const [
       tenant,
-      totalCategories,
-      totalDishes,
-      totalIngredients,
+      totalBrands,
+      totalLocations,
+      totalMenus,
+      totalItems,
       todayUsage,
       monthlyUsage,
       recentSessions,
@@ -32,13 +33,16 @@ export async function GET() {
           },
         },
       }),
-      prisma.category.count({
-        where: { tenantId: session.tenantId, deletedAt: null },
+      prisma.brand.count({
+        where: { tenantId: session.tenantId },
       }),
-      prisma.dish.count({
-        where: { tenantId: session.tenantId, deletedAt: null },
+      prisma.location.count({
+        where: { tenantId: session.tenantId },
       }),
-      prisma.ingredient.count({
+      prisma.menu.count({
+        where: { tenantId: session.tenantId },
+      }),
+      prisma.item.count({
         where: { tenantId: session.tenantId },
       }),
       prisma.usageAnalytics.findFirst({
@@ -82,9 +86,10 @@ export async function GET() {
           }
         : null,
       stats: {
-        totalCategories,
-        totalDishes,
-        totalIngredients,
+        totalBrands,
+        totalLocations,
+        totalMenus,
+        totalItems,
         todayApiCalls: todayUsage?.apiCalls || 0,
         todayChatSessions: todayUsage?.chatSessions || 0,
         todayMenuViews: todayUsage?.menuViews || 0,

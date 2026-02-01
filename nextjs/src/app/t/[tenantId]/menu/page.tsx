@@ -10,27 +10,60 @@ interface MenuPageProps {
 
 async function getMenuData(tenantId: string) {
   try {
-    const tenant = await prisma.tenant.findUnique({
-      where: { id: tenantId },
+    // Try to find by slug first, then by id
+    let tenant = await prisma.tenant.findUnique({
+      where: { slug: tenantId },
       select: {
         id: true,
         name: true,
+        defaultLocale: true,
       },
     });
 
+    // If not found by slug, try by id (for UUID-based lookups)
+    if (!tenant) {
+      tenant = await prisma.tenant.findUnique({
+        where: { id: tenantId },
+        select: {
+          id: true,
+          name: true,
+          defaultLocale: true,
+        },
+      });
+    }
+
     if (!tenant) return null;
 
-    const categories = await prisma.category.findMany({
-      where: { tenantId },
-      orderBy: { displayOrder: 'asc' },
+    // Get published menus with sections and items via join tables
+    const menus = await prisma.menu.findMany({
+      where: { tenantId: tenant.id, status: 'published' },
       include: {
-        dishes: {
-          where: { isAvailable: true },
+        translations: true,
+        menuSections: {
+          where: { section: { isActive: true } },
           orderBy: { displayOrder: 'asc' },
           include: {
-            ingredients: {
+            section: {
               include: {
-                ingredient: true,
+                translations: true,
+              },
+            },
+          },
+        },
+        menuItems: {
+          orderBy: { displayOrder: 'asc' },
+          include: {
+            item: {
+              include: {
+                translations: true,
+                priceBase: true,
+                ingredients: { include: { ingredient: true } },
+                allergens: {
+                  include: { allergen: { include: { translations: true } } },
+                },
+                dietaryFlags: {
+                  include: { dietaryFlag: { include: { translations: true } } },
+                },
               },
             },
           },
@@ -38,11 +71,31 @@ async function getMenuData(tenantId: string) {
       },
     });
 
-    return { tenant, categories };
+    return { tenant, menus };
   } catch (error) {
     console.error('Error fetching menu:', error);
     return null;
   }
+}
+
+// Type definitions for type inference
+type MenuData = NonNullable<Awaited<ReturnType<typeof getMenuData>>>;
+type MenuItem = MenuData['menus'][0]['menuItems'][0]['item'];
+type SectionTranslation = MenuData['menus'][0]['menuSections'][0]['section']['translations'][0];
+type MenuTranslation = MenuData['menus'][0]['translations'][0];
+type ItemTranslation = MenuItem['translations'][0];
+
+// Helper to get translation
+function getTranslation<T extends { locale: string }>(
+  translations: T[],
+  locale: string,
+  fallback: string = 'en-US'
+): T | undefined {
+  return (
+    translations.find((t) => t.locale === locale) ||
+    translations.find((t) => t.locale === fallback) ||
+    translations[0]
+  );
 }
 
 export default async function MenuPage({ params }: MenuPageProps) {
@@ -53,7 +106,27 @@ export default async function MenuPage({ params }: MenuPageProps) {
     notFound();
   }
 
-  const { tenant, categories } = data;
+  const { tenant, menus } = data;
+  const locale = tenant.defaultLocale || 'en-US';
+
+  // Flatten all sections from all published menus (via join tables)
+  // Items are now linked via menuItems join table
+  const allSections = menus.flatMap((menu) =>
+    menu.menuSections.map((ms) => {
+      // Get items for this section from menuItems, sorted by displayOrder (filter visible items)
+      const sectionItems = menu.menuItems
+        .filter((mi) => mi.sectionId === ms.sectionId && mi.item.isVisible)
+        .sort((a, b) => a.displayOrder - b.displayOrder)
+        .map((mi) => mi.item);
+      
+      return {
+        ...ms.section,
+        displayOrder: ms.displayOrder,
+        items: sectionItems,
+        menuName: (getTranslation(menu.translations, locale) as MenuTranslation | undefined)?.name || menu.code,
+      };
+    })
+  );
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -78,85 +151,131 @@ export default async function MenuPage({ params }: MenuPageProps) {
 
       {/* Menu Content */}
       <main className="max-w-6xl mx-auto px-4 py-8">
-        {categories.length === 0 ? (
+        {allSections.length === 0 ? (
           <div className="text-center py-12">
             <p className="text-gray-500 text-lg">No menu items available yet.</p>
           </div>
         ) : (
           <div className="space-y-12">
-            {categories.map((category) => (
-              <section key={category.id}>
-                <div className="border-b border-gray-200 pb-2 mb-6">
-                  <h2 className="text-2xl font-semibold text-gray-800">{category.name}</h2>
-                  {category.description && (
-                    <p className="text-gray-500 mt-1">{category.description}</p>
-                  )}
-                </div>
+            {allSections.map((section) => {
+              const sectionTrans = getTranslation(section.translations, locale);
+              return (
+                <section key={section.id}>
+                  <div className="border-b border-gray-200 pb-2 mb-6">
+                    <h2 className="text-2xl font-semibold text-gray-800">
+                      {sectionTrans?.title || 'Section'}
+                    </h2>
+                    {sectionTrans?.description && (
+                      <p className="text-gray-500 mt-1">{sectionTrans.description}</p>
+                    )}
+                  </div>
 
-                <div className="grid gap-6 md:grid-cols-2">
-                  {category.dishes.map((dish) => (
-                    <div
-                      key={dish.id}
-                      className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow"
-                    >
-                      {dish.imageUrl && (
-                        <div className="h-48 bg-gray-100">
-                          <img
-                            src={dish.imageUrl}
-                            alt={dish.name}
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                      )}
-                      <div className="p-4">
-                        <div className="flex justify-between items-start gap-4">
-                          <div className="flex-1">
-                            <h3 className="font-semibold text-lg text-gray-800">{dish.name}</h3>
-                            {dish.description && (
-                              <p className="text-gray-600 text-sm mt-1">{dish.description}</p>
+                  <div className="grid gap-6 md:grid-cols-2">
+                    {section.items.map((item) => {
+                      const itemTrans = getTranslation(item.translations, locale);
+                      const price = item.priceBase
+                        ? (Number(item.priceBase.amountMinor) / 100).toFixed(2)
+                        : null;
+
+                      return (
+                        <div
+                          key={item.id}
+                          className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow"
+                        >
+                          <div className="p-4">
+                            <div className="flex justify-between items-start gap-4">
+                              <div className="flex-1">
+                                <h3 className="font-semibold text-lg text-gray-800">
+                                  {itemTrans?.name || 'Item'}
+                                </h3>
+                                {itemTrans?.description && (
+                                  <p className="text-gray-600 text-sm mt-1">
+                                    {itemTrans.description}
+                                  </p>
+                                )}
+                              </div>
+                              {price && (
+                                <span className="font-bold text-teal-600 text-lg whitespace-nowrap">
+                                  €{price}
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Dietary Tags */}
+                            {item.dietaryFlags.length > 0 && (
+                              <div className="flex flex-wrap gap-2 mt-3">
+                                {item.dietaryFlags.map((df) => {
+                                  const dfTrans = getTranslation(
+                                    df.dietaryFlag.translations,
+                                    locale
+                                  );
+                                  return (
+                                    <span
+                                      key={df.dietaryFlag.code}
+                                      className="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full"
+                                    >
+                                      🏷️ {dfTrans?.name || df.dietaryFlag.code}
+                                    </span>
+                                  );
+                                })}
+                              </div>
+                            )}
+
+                            {/* Spiciness */}
+                            {item.spicinessLevel && item.spicinessLevel > 0 && (
+                              <div className="mt-2">
+                                <span className="text-xs text-orange-600">
+                                  {'🌶️'.repeat(item.spicinessLevel)}
+                                </span>
+                              </div>
+                            )}
+
+                            {/* Ingredients */}
+                            {item.ingredients.length > 0 && (
+                              <div className="mt-3 pt-3 border-t border-gray-100">
+                                <p className="text-xs text-gray-500">
+                                  <span className="font-medium">Ingredients: </span>
+                                  {item.ingredients
+                                    .map((ii) => ii.ingredient.name)
+                                    .join(', ')}
+                                </p>
+                              </div>
+                            )}
+
+                            {/* Allergens */}
+                            {item.allergens.length > 0 && (
+                              <div className="mt-2">
+                                <p className="text-xs text-orange-600">
+                                  <span className="font-medium">⚠️ Allergens: </span>
+                                  {item.allergens
+                                    .map((a) => {
+                                      const aTrans = getTranslation(
+                                        a.allergen.translations,
+                                        locale
+                                      );
+                                      return aTrans?.name || a.allergen.code;
+                                    })
+                                    .join(', ')}
+                                </p>
+                              </div>
+                            )}
+
+                            {/* Calories */}
+                            {item.calories && (
+                              <div className="mt-2">
+                                <span className="text-xs text-gray-500">
+                                  📊 {item.calories} cal
+                                </span>
+                              </div>
                             )}
                           </div>
-                          <span className="font-bold text-teal-600 text-lg whitespace-nowrap">
-                            €{Number(dish.price).toFixed(2)}
-                          </span>
                         </div>
-
-                        {/* Dietary Tags */}
-                        <div className="flex flex-wrap gap-2 mt-3">
-                          {dish.isVegetarian && (
-                            <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full">
-                              🥬 Vegetarian
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Ingredients */}
-                        {dish.ingredients.length > 0 && (
-                          <div className="mt-3 pt-3 border-t border-gray-100">
-                            <p className="text-xs text-gray-500">
-                              <span className="font-medium">Ingredients: </span>
-                              {dish.ingredients
-                                .map((di) => di.ingredient.name)
-                                .join(', ')}
-                            </p>
-                          </div>
-                        )}
-
-                        {/* Allergens */}
-                        {dish.allergens && dish.allergens.length > 0 && (
-                          <div className="mt-2">
-                            <p className="text-xs text-orange-600">
-                              <span className="font-medium">⚠️ Allergens: </span>
-                              {dish.allergens.join(', ')}
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </section>
-            ))}
+                      );
+                    })}
+                  </div>
+                </section>
+              );
+            })}
           </div>
         )}
       </main>

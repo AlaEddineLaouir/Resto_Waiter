@@ -20,6 +20,7 @@ export async function GET() {
         email: true,
         username: true,
         role: true,
+        tenantId: true,
         tenant: {
           select: {
             id: true,
@@ -37,7 +38,11 @@ export async function GET() {
       );
     }
 
-    return NextResponse.json({ admin });
+    // Also return tenantSlug from session for frontend validation
+    return NextResponse.json({ 
+      admin,
+      tenantSlug: session.tenantSlug || admin.tenant.slug,
+    });
   } catch (error) {
     console.error('Get restaurant admin error:', error);
     return NextResponse.json(

@@ -7,8 +7,9 @@ import Link from 'next/link';
 interface Ingredient {
   id: string;
   name: string;
-  allergens: string[];
-  _count?: { dishes: number };
+  allergenCode: string | null;
+  isAllergen: boolean;
+  _count?: { items: number };
 }
 
 export default function IngredientsPage() {
@@ -20,7 +21,7 @@ export default function IngredientsPage() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [formData, setFormData] = useState({ name: '', allergens: '' });
+  const [formData, setFormData] = useState({ name: '', allergenCode: '', isAllergen: false });
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -55,7 +56,8 @@ export default function IngredientsPage() {
 
       const body = {
         name: formData.name,
-        allergens: formData.allergens.split(',').map(a => a.trim()).filter(Boolean),
+        allergenCode: formData.allergenCode || null,
+        isAllergen: formData.isAllergen,
       };
 
       const res = await fetch(url, {
@@ -71,7 +73,7 @@ export default function IngredientsPage() {
 
       setShowForm(false);
       setEditingId(null);
-      setFormData({ name: '', allergens: '' });
+      setFormData({ name: '', allergenCode: '', isAllergen: false });
       fetchIngredients();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save');
@@ -81,7 +83,8 @@ export default function IngredientsPage() {
   const handleEdit = (ingredient: Ingredient) => {
     setFormData({ 
       name: ingredient.name, 
-      allergens: ingredient.allergens.join(', ') 
+      allergenCode: ingredient.allergenCode || '',
+      isAllergen: ingredient.isAllergen,
     });
     setEditingId(ingredient.id);
     setShowForm(true);
@@ -121,7 +124,7 @@ export default function IngredientsPage() {
             <h1 className="text-xl font-bold text-gray-900">Ingredients</h1>
           </div>
           <button
-            onClick={() => { setShowForm(true); setEditingId(null); setFormData({ name: '', allergens: '' }); }}
+            onClick={() => { setShowForm(true); setEditingId(null); setFormData({ name: '', allergenCode: '', isAllergen: false }); }}
             className="bg-orange-500 text-white px-4 py-2 rounded-md hover:bg-orange-600"
           >
             + Add Ingredient
@@ -154,14 +157,26 @@ export default function IngredientsPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Allergens (comma-separated)</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Allergen Code</label>
                 <input
                   type="text"
-                  value={formData.allergens}
-                  onChange={(e) => setFormData({ ...formData, allergens: e.target.value })}
+                  value={formData.allergenCode}
+                  onChange={(e) => setFormData({ ...formData, allergenCode: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                  placeholder="gluten, dairy, nuts"
+                  placeholder="e.g., gluten, milk, nuts"
                 />
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="isAllergen"
+                  checked={formData.isAllergen}
+                  onChange={(e) => setFormData({ ...formData, isAllergen: e.target.checked })}
+                  className="w-4 h-4 text-orange-500"
+                />
+                <label htmlFor="isAllergen" className="text-sm font-medium text-gray-700">
+                  This ingredient is an allergen
+                </label>
               </div>
               <div className="flex gap-2">
                 <button
@@ -190,8 +205,8 @@ export default function IngredientsPage() {
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Allergens</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Used in Dishes</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Allergen</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Used in Items</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
                 </tr>
               </thead>
@@ -200,16 +215,19 @@ export default function IngredientsPage() {
                   <tr key={ingredient.id}>
                     <td className="px-6 py-4 font-medium">{ingredient.name}</td>
                     <td className="px-6 py-4 text-gray-500">
-                      {ingredient.allergens.length > 0 
-                        ? ingredient.allergens.map((a, i) => (
-                            <span key={i} className="inline-block bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded mr-1">
-                              {a}
-                            </span>
-                          ))
-                        : '-'
-                      }
+                      {ingredient.isAllergen && ingredient.allergenCode ? (
+                        <span className="inline-block bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded">
+                          {ingredient.allergenCode}
+                        </span>
+                      ) : ingredient.isAllergen ? (
+                        <span className="inline-block bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded">
+                          ⚠️ Allergen
+                        </span>
+                      ) : (
+                        '-'
+                      )}
                     </td>
-                    <td className="px-6 py-4">{ingredient._count?.dishes || 0}</td>
+                    <td className="px-6 py-4">{ingredient._count?.items || 0}</td>
                     <td className="px-6 py-4">
                       <button
                         onClick={() => handleEdit(ingredient)}

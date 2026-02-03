@@ -91,6 +91,7 @@ async function main() {
     data: {
       tenantId: tenant.id,
       brandId: brand.id,
+      slug: 'paris-belleville',
       name: 'Paris Belleville',
       addressLine1: '45 Rue de Belleville',
       city: 'Paris',
@@ -106,6 +107,7 @@ async function main() {
     data: {
       tenantId: tenant.id,
       brandId: brand.id,
+      slug: 'alger-centre',
       name: 'Alger Centre',
       addressLine1: 'Rue Didouche Mourad 123',
       city: 'Alger',

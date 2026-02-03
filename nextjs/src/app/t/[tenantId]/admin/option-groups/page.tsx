@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
+import { usePermissions, RequirePermission, Can } from '@/lib/permissions';
 
 interface Menu {
   id: string;
@@ -221,6 +222,7 @@ export default function OptionGroupsPage() {
   }
 
   return (
+    <RequirePermission entity="option-groups" action="read">
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-white shadow-sm">
@@ -232,12 +234,14 @@ export default function OptionGroupsPage() {
               </Link>
               <h1 className="text-2xl font-bold text-gray-800">Option Groups</h1>
             </div>
+            <Can entity="option-groups" action="create">
             <button
               onClick={() => setShowForm(true)}
               className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700"
             >
               + Add Option Group
             </button>
+            </Can>
           </div>
         </div>
       </header>
@@ -483,6 +487,7 @@ export default function OptionGroupsPage() {
                   )}
 
                   <div className="flex justify-end gap-2 pt-2 border-t">
+                    <Can entity="option-groups" action="update">
                     <button
                       onClick={() => handleAddOption(group.id)}
                       className="text-sm text-purple-600 hover:text-purple-700"
@@ -495,12 +500,15 @@ export default function OptionGroupsPage() {
                     >
                       Edit
                     </button>
+                    </Can>
+                    <Can entity="option-groups" action="delete">
                     <button
                       onClick={() => handleDelete(group.id)}
                       className="text-sm text-red-600 hover:text-red-700"
                     >
                       Delete
                     </button>
+                    </Can>
                   </div>
                 </div>
               );
@@ -509,5 +517,6 @@ export default function OptionGroupsPage() {
         )}
       </main>
     </div>
+    </RequirePermission>
   );
 }

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
+import { usePermissions, RequirePermission, Can } from '@/lib/permissions';
 
 interface Brand {
   id: string;
@@ -102,6 +103,7 @@ export default function BrandsPage() {
   }
 
   return (
+    <RequirePermission entity="brands" action="read">
     <div className="min-h-screen bg-gray-100">
       <header className="bg-white shadow">
         <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
@@ -111,12 +113,14 @@ export default function BrandsPage() {
             </Link>
             <h1 className="text-xl font-bold text-gray-900">Brands</h1>
           </div>
-          <button
-            onClick={() => { setShowForm(true); setEditingId(null); setFormData({ name: '', slug: '' }); }}
-            className="bg-orange-500 text-white px-4 py-2 rounded-md hover:bg-orange-600"
-          >
-            + Add Brand
-          </button>
+          <Can entity="brands" action="create">
+            <button
+              onClick={() => { setShowForm(true); setEditingId(null); setFormData({ name: '', slug: '' }); }}
+              className="bg-orange-500 text-white px-4 py-2 rounded-md hover:bg-orange-600"
+            >
+              + Add Brand
+            </button>
+          </Can>
         </div>
       </header>
 
@@ -193,12 +197,16 @@ export default function BrandsPage() {
                     <td className="px-6 py-4">{brand._count.locations}</td>
                     <td className="px-6 py-4">{brand._count.menus}</td>
                     <td className="px-6 py-4">
-                      <button onClick={() => handleEdit(brand)} className="text-blue-500 hover:text-blue-700 mr-3">
-                        Edit
-                      </button>
-                      <button onClick={() => handleDelete(brand.id)} className="text-red-500 hover:text-red-700">
-                        Delete
-                      </button>
+                      <Can entity="brands" action="update">
+                        <button onClick={() => handleEdit(brand)} className="text-blue-500 hover:text-blue-700 mr-3">
+                          Edit
+                        </button>
+                      </Can>
+                      <Can entity="brands" action="delete">
+                        <button onClick={() => handleDelete(brand.id)} className="text-red-500 hover:text-red-700">
+                          Delete
+                        </button>
+                      </Can>
                     </td>
                   </tr>
                 ))}
@@ -208,5 +216,6 @@ export default function BrandsPage() {
         </div>
       </div>
     </div>
+    </RequirePermission>
   );
 }

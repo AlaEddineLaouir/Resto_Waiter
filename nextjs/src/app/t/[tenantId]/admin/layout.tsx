@@ -3,23 +3,29 @@
 import { useEffect, useState } from 'react';
 import { useRouter, useParams, usePathname } from 'next/navigation';
 import Link from 'next/link';
+import { PermissionProvider } from '@/lib/permissions';
 
 interface AdminUser {
   id: string;
   username: string;
   email: string;
   role: string;
+  permissions?: string[];
 }
 
 interface NavItem {
   name: string;
   href: string;
   icon: React.ReactNode;
+  roles?: string[]; // Optional: only show to these roles
+  permission?: string; // Permission required to see this item
 }
 
 interface NavSection {
   title: string;
   items: NavItem[];
+  roles?: string[]; // Optional: only show section to these roles
+  permissions?: string[]; // Any of these permissions grants access to section
 }
 
 // Icons as components for cleaner code
@@ -96,6 +102,11 @@ const Icons = {
       <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
     </svg>
   ),
+  users: (
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
+    </svg>
+  ),
 };
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -133,6 +144,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           return;
         }
         
+        console.log('[DEBUG] Admin data:', data.admin);
         setAdmin(data.admin);
       } catch {
         if (!pathname.includes('/login')) {
@@ -167,36 +179,78 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     );
   }
 
+  // Get user permissions from admin data
+  const userPermissions = admin?.permissions || [];
+  
+  // Helper to check if user has permission (owner has all permissions)
+  const hasPermission = (permission: string): boolean => {
+    if (!admin) return false;
+    if (admin.role === 'owner') return true;
+    return userPermissions.includes(permission);
+  };
+
   const navSections: NavSection[] = [
     {
       title: 'Dashboard',
       items: [
-        { name: 'Overview', href: `/t/${tenantId}/admin`, icon: Icons.home },
+        { name: 'Overview', href: `/t/${tenantId}/admin`, icon: Icons.home, permission: 'dashboard.read' },
       ],
     },
     {
       title: 'Organization',
+      permissions: ['brands.read', 'locations.read', 'ingredients.read'],
       items: [
-        { name: 'Brands', href: `/t/${tenantId}/admin/brands`, icon: Icons.building },
-        { name: 'Locations', href: `/t/${tenantId}/admin/locations`, icon: Icons.location },
-        { name: 'Ingredients', href: `/t/${tenantId}/admin/ingredients`, icon: Icons.beaker },
+        { name: 'Brands', href: `/t/${tenantId}/admin/brands`, icon: Icons.building, permission: 'brands.read' },
+        { name: 'Locations', href: `/t/${tenantId}/admin/locations`, icon: Icons.location, permission: 'locations.read' },
+        { name: 'Ingredients', href: `/t/${tenantId}/admin/ingredients`, icon: Icons.beaker, permission: 'ingredients.read' },
       ],
     },
     {
       title: 'Menu Structure',
+      permissions: ['menus.read', 'sections.read', 'items.read'],
       items: [
-        { name: 'Menus', href: `/t/${tenantId}/admin/menus`, icon: Icons.clipboard },
-        { name: 'Sections', href: `/t/${tenantId}/admin/sections`, icon: Icons.bars },
-        { name: 'Items', href: `/t/${tenantId}/admin/items`, icon: Icons.book },
+        { name: 'Menus', href: `/t/${tenantId}/admin/menus`, icon: Icons.clipboard, permission: 'menus.read' },
+        { name: 'Sections', href: `/t/${tenantId}/admin/sections`, icon: Icons.bars, permission: 'sections.read' },
+        { name: 'Items', href: `/t/${tenantId}/admin/items`, icon: Icons.book, permission: 'items.read' },
       ],
     },
     {
       title: 'Customizations',
+      permissions: ['option-groups.read'],
       items: [
-        { name: 'Option Groups', href: `/t/${tenantId}/admin/option-groups`, icon: Icons.adjustments },
+        { name: 'Option Groups', href: `/t/${tenantId}/admin/option-groups`, icon: Icons.adjustments, permission: 'option-groups.read' },
       ],
     },
+    {
+      title: 'Team',
+      permissions: ['users.read'],
+      items: [
+        { name: 'Users & Staff', href: `/t/${tenantId}/admin/users`, icon: Icons.users, permission: 'users.read' },
+      ],
+      roles: ['owner', 'manager'], // Only visible to owners and managers
+    },
   ];
+
+  // Filter sections and items based on permissions
+  const filteredNavSections = navSections
+    .filter((section) => {
+      // Role-based check
+      if (section.roles && admin && !section.roles.includes(admin.role)) return false;
+      // Permission-based check for section
+      if (section.permissions && !section.permissions.some(p => hasPermission(p))) return false;
+      return true;
+    })
+    .map((section) => ({
+      ...section,
+      items: section.items.filter((item) => {
+        // Role-based check
+        if (item.roles && admin && !item.roles.includes(admin.role)) return false;
+        // Permission-based check
+        if (item.permission && !hasPermission(item.permission)) return false;
+        return true;
+      }),
+    }))
+    .filter((section) => section.items.length > 0); // Remove empty sections
 
   const isActive = (href: string) => {
     if (href === `/t/${tenantId}/admin`) {
@@ -217,6 +271,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   };
 
   return (
+    <PermissionProvider tenantId={tenantId}>
     <div className="min-h-screen bg-[#F9FAFB] flex">
       {/* Sidebar */}
       <aside
@@ -238,7 +293,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         {/* Navigation */}
         <nav className="flex-1 overflow-y-auto py-4 px-3">
-          {navSections.map((section, idx) => (
+          {filteredNavSections.map((section, idx) => (
             <div key={section.title} className={idx > 0 ? 'mt-6' : ''}>
               {!sidebarCollapsed && (
                 <h3 className="px-3 mb-2 text-xs font-semibold text-[#6B7280] uppercase tracking-wider">
@@ -355,5 +410,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </main>
       </div>
     </div>
+    </PermissionProvider>
   );
 }

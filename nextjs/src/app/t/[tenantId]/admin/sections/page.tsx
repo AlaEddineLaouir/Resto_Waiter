@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import AIDescriptionHelper from '@/components/AIDescriptionHelper';
+import { usePermissions, RequirePermission, Can } from '@/lib/permissions';
 
 interface Section {
   id: string;
@@ -204,6 +205,7 @@ export default function SectionsPage() {
   }
 
   return (
+    <RequirePermission entity="sections" action="read">
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-white shadow-sm border-b">
@@ -219,6 +221,7 @@ export default function SectionsPage() {
               </Link>
             </div>
             <h1 className="text-2xl font-bold text-gray-800">Menu Sections</h1>
+            <Can entity="sections" action="create">
             <button
               onClick={() => setShowForm(true)}
               className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors shadow-sm"
@@ -226,6 +229,7 @@ export default function SectionsPage() {
               <Icons.Plus />
               <span>Create Section</span>
             </button>
+            </Can>
           </div>
         </div>
       </header>
@@ -423,6 +427,7 @@ export default function SectionsPage() {
 
                   {/* Actions */}
                   <div className="flex items-center gap-2 pt-3 border-t">
+                    <Can entity="sections" action="update">
                     <button
                       onClick={() => handleEdit(section)}
                       className="flex items-center gap-1 px-3 py-1.5 text-sm text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
@@ -436,12 +441,15 @@ export default function SectionsPage() {
                     >
                       {section.isActive ? 'Deactivate' : 'Activate'}
                     </button>
+                    </Can>
+                    <Can entity="sections" action="delete">
                     <button
                       onClick={() => handleDelete(section)}
                       className="flex items-center gap-1 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors ml-auto"
                     >
                       <Icons.Trash />
                     </button>
+                    </Can>
                   </div>
                 </div>
               );
@@ -487,6 +495,7 @@ export default function SectionsPage() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right">
                         <div className="flex items-center justify-end gap-2">
+                          <Can entity="sections" action="update">
                           <button
                             onClick={() => handleEdit(section)}
                             className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
@@ -500,6 +509,8 @@ export default function SectionsPage() {
                           >
                             {section.isActive ? 'Deactivate' : 'Activate'}
                           </button>
+                          </Can>
+                          <Can entity="sections" action="delete">
                           <button
                             onClick={() => handleDelete(section)}
                             className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
@@ -507,6 +518,7 @@ export default function SectionsPage() {
                           >
                             <Icons.Trash />
                           </button>
+                          </Can>
                         </div>
                       </td>
                     </tr>
@@ -518,5 +530,6 @@ export default function SectionsPage() {
         )}
       </main>
     </div>
+    </RequirePermission>
   );
 }

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
+import { usePermissions, RequirePermission, Can } from '@/lib/permissions';
 
 interface DashboardData {
   stats: {
@@ -137,6 +138,7 @@ export default function RestaurantAdminDashboard() {
   ];
 
   return (
+    <RequirePermission entity="dashboard" action="read">
     <div className="space-y-6">
       {/* Welcome Section */}
       <div className="bg-gradient-to-br from-indigo-600 to-indigo-700 rounded-xl p-6 text-white shadow-lg">
@@ -237,5 +239,6 @@ export default function RestaurantAdminDashboard() {
         </div>
       </div>
     </div>
+    </RequirePermission>
   );
 }

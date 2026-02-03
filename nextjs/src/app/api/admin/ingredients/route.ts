@@ -1,13 +1,12 @@
 import { NextResponse } from 'next/server';
-import { getRestaurantSession } from '@/lib/restaurant-auth';
 import { prisma } from '@/lib/prisma';
+import { requirePermission } from '@/lib/rbac';
 
 export async function GET() {
   try {
-    const session = await getRestaurantSession();
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const guard = await requirePermission('ingredient.read');
+    if (!guard.authorized) return guard.response;
+    const session = guard.user!;
 
     const ingredients = await prisma.ingredient.findMany({
       where: {
@@ -28,10 +27,9 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
-    const session = await getRestaurantSession();
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const guard = await requirePermission('ingredient.create');
+    if (!guard.authorized) return guard.response;
+    const session = guard.user!;
 
     const { name, allergenCode, isAllergen } = await req.json();
 

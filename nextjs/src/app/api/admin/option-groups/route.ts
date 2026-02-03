@@ -1,13 +1,12 @@
 import { NextResponse } from 'next/server';
-import { getRestaurantSession } from '@/lib/restaurant-auth';
 import { prisma } from '@/lib/prisma';
+import { requirePermission } from '@/lib/rbac';
 
 export async function GET() {
   try {
-    const session = await getRestaurantSession();
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const guard = await requirePermission('option.read');
+    if (!guard.authorized) return guard.response;
+    const session = guard.user!;
 
     const optionGroups = await prisma.optionGroup.findMany({
       where: { tenantId: session.tenantId },
@@ -34,7 +33,19 @@ export async function GET() {
       orderBy: { displayOrder: 'asc' },
     });
 
-    return NextResponse.json({ optionGroups });
+    // Convert BigInt to string for JSON serialization
+    const serializedOptionGroups = optionGroups.map(group => ({
+      ...group,
+      options: group.options.map(option => ({
+        ...option,
+        price: option.price ? {
+          ...option.price,
+          deltaMinor: option.price.deltaMinor?.toString() || null,
+        } : null,
+      })),
+    }));
+
+    return NextResponse.json({ optionGroups: serializedOptionGroups });
   } catch (error) {
     console.error('Get option groups error:', error);
     return NextResponse.json({ error: 'Failed to get option groups' }, { status: 500 });
@@ -43,10 +54,9 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
-    const session = await getRestaurantSession();
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const guard = await requirePermission('option.create');
+    if (!guard.authorized) return guard.response;
+    const session = guard.user!;
 
     const {
       menuId,

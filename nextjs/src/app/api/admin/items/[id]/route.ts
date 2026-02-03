@@ -1,16 +1,15 @@
 import { NextResponse } from 'next/server';
-import { getRestaurantSession } from '@/lib/restaurant-auth';
 import { prisma } from '@/lib/prisma';
+import { requirePermission } from '@/lib/rbac';
 
 export async function GET(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getRestaurantSession();
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const guard = await requirePermission('item.read');
+    if (!guard.authorized) return guard.response;
+    const session = guard.user!;
 
     const { id } = await params;
 
@@ -59,10 +58,9 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getRestaurantSession();
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const guard = await requirePermission('item.update');
+    if (!guard.authorized) return guard.response;
+    const session = guard.user!;
 
     const { id } = await params;
     const {
@@ -213,10 +211,9 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getRestaurantSession();
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const guard = await requirePermission('item.delete');
+    if (!guard.authorized) return guard.response;
+    const session = guard.user!;
 
     const { id } = await params;
 

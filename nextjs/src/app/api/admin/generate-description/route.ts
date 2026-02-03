@@ -1,7 +1,12 @@
 import { NextResponse } from 'next/server';
+import { requirePermission } from '@/lib/rbac';
 
 export async function POST(req: Request) {
   try {
+    // Require at least item.create permission to generate AI descriptions
+    const guard = await requirePermission('item.create');
+    if (!guard.authorized) return guard.response;
+
     const { context, contextType } = await req.json();
 
     if (!context) {

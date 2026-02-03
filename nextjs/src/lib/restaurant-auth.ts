@@ -13,6 +13,7 @@ export interface RestaurantSession {
   tenantId: string;
   tenantSlug: string;
   role: string;
+  locationIds?: string[]; // For location-scoped access
 }
 
 export async function hashPassword(password: string): Promise<string> {

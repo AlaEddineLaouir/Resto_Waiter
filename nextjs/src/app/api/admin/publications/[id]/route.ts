@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { getRestaurantSession } from '@/lib/restaurant-auth';
 import { prisma } from '@/lib/prisma';
+import { requirePermission } from '@/lib/rbac';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -12,10 +12,9 @@ interface RouteParams {
  */
 export async function PATCH(req: Request, { params }: RouteParams) {
   try {
-    const session = await getRestaurantSession();
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const guard = await requirePermission('publication.update');
+    if (!guard.authorized) return guard.response;
+    const session = guard.user!;
 
     const { id } = await params;
     const { isCurrent } = await req.json();
@@ -88,10 +87,9 @@ export async function PATCH(req: Request, { params }: RouteParams) {
  */
 export async function DELETE(req: Request, { params }: RouteParams) {
   try {
-    const session = await getRestaurantSession();
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const guard = await requirePermission('publication.delete');
+    if (!guard.authorized) return guard.response;
+    const session = guard.user!;
 
     const { id } = await params;
 

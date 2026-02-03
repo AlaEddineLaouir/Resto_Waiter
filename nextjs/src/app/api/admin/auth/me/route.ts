@@ -19,8 +19,10 @@ export async function GET() {
         id: true,
         email: true,
         username: true,
+        displayName: true,
         role: true,
         tenantId: true,
+        locationIds: true,
         tenant: {
           select: {
             id: true,
@@ -38,9 +40,37 @@ export async function GET() {
       );
     }
 
+    // Get user's permissions based on their role
+    let permissions: string[] = [];
+    
+    try {
+      const systemRole = await prisma.systemRole.findUnique({
+        where: { slug: admin.role },
+        include: {
+          permissions: {
+            include: {
+              permission: {
+                select: { key: true },
+              },
+            },
+          },
+        },
+      });
+
+      if (systemRole) {
+        permissions = systemRole.permissions.map(rp => rp.permission.key);
+      }
+    } catch {
+      // SystemRole table might not exist yet, fallback to empty permissions
+      console.warn('Could not fetch system role permissions');
+    }
+
     // Also return tenantSlug from session for frontend validation
     return NextResponse.json({ 
-      admin,
+      admin: {
+        ...admin,
+        permissions,
+      },
       tenantSlug: session.tenantSlug || admin.tenant.slug,
     });
   } catch (error) {

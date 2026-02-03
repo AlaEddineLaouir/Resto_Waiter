@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
+import { usePermissions, RequirePermission, Can } from '@/lib/permissions';
 
 interface Brand {
   id: string;
@@ -262,6 +263,7 @@ export default function MenusPage() {
   }
 
   return (
+    <RequirePermission entity="menus" action="read">
     <div className="min-h-screen bg-gray-100">
       <header className="bg-white shadow">
         <div className="max-w-7xl mx-auto px-4 py-4">
@@ -272,12 +274,14 @@ export default function MenusPage() {
               </Link>
               <h1 className="text-xl font-bold text-gray-900">Menus</h1>
             </div>
+            <Can entity="menus" action="create">
             <button
               onClick={() => { setShowForm(true); setEditingId(null); resetForm(); }}
               className="bg-orange-500 text-white px-4 py-2 rounded-md hover:bg-orange-600"
             >
               + Add Menu
             </button>
+            </Can>
           </div>
           
           {/* Filters */}
@@ -533,18 +537,22 @@ export default function MenusPage() {
                       {(menu._count?.menuSections ?? 0) + (menu._count?.lines ?? 0)} sections
                     </td>
                     <td className="px-6 py-4 text-right">
+                      <Can entity="menus" action="update">
                       <button 
                         onClick={(e) => { e.stopPropagation(); handleEdit(menu); }} 
                         className="text-blue-500 hover:text-blue-700 mr-3"
                       >
                         Edit
                       </button>
+                      </Can>
+                      <Can entity="menus" action="delete">
                       <button 
                         onClick={(e) => { e.stopPropagation(); handleDelete(menu.id); }} 
                         className="text-red-500 hover:text-red-700"
                       >
                         Delete
                       </button>
+                      </Can>
                     </td>
                   </tr>
                 ))}
@@ -558,5 +566,6 @@ export default function MenusPage() {
         </div>
       </div>
     </div>
+    </RequirePermission>
   );
 }

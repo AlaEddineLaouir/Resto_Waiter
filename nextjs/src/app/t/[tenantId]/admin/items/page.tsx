@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import AIDescriptionHelper from '@/components/AIDescriptionHelper';
+import { usePermissions, RequirePermission, Can } from '@/lib/permissions';
 
 interface Section {
   id: string;
@@ -361,6 +362,9 @@ export default function ItemsPage() {
 
   const filteredItems = selectedSectionId ? items.filter((i) => i.sectionId === selectedSectionId) : items;
 
+  // Get permission hooks
+  const { canCreate, canUpdate, canDelete } = usePermissions();
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -373,6 +377,7 @@ export default function ItemsPage() {
   }
 
   return (
+    <RequirePermission entity="items" action="read">
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-white shadow-sm border-b">
@@ -385,13 +390,15 @@ export default function ItemsPage() {
               </Link>
             </div>
             <h1 className="text-2xl font-bold text-gray-800">Menu Items</h1>
-            <button
-              onClick={() => { setFormData({ ...formData, sectionId: selectedSectionId }); setShowForm(true); }}
-              className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors shadow-sm"
-            >
-              <Icons.Plus />
-              <span>Create Item</span>
-            </button>
+            <Can entity="items" action="create">
+              <button
+                onClick={() => { setFormData({ ...formData, sectionId: selectedSectionId }); setShowForm(true); }}
+                className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors shadow-sm"
+              >
+                <Icons.Plus />
+                <span>Create Item</span>
+              </button>
+            </Can>
           </div>
         </div>
       </header>
@@ -740,20 +747,24 @@ export default function ItemsPage() {
 
                       {/* Actions */}
                       <div className="flex items-center gap-2 flex-shrink-0">
-                        <button
-                          onClick={() => handleEdit(item)}
-                          className="flex items-center gap-1.5 px-3 py-2 text-sm text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors font-medium"
-                        >
-                          <Icons.Edit />
-                          <span className="hidden sm:inline">Edit</span>
-                        </button>
-                        <button
-                          onClick={() => handleDeleteConfirm(item)}
-                          className="flex items-center gap-1.5 px-3 py-2 text-sm text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors font-medium"
-                        >
-                          <Icons.Trash />
-                          <span className="hidden sm:inline">Delete</span>
-                        </button>
+                        <Can entity="items" action="update">
+                          <button
+                            onClick={() => handleEdit(item)}
+                            className="flex items-center gap-1.5 px-3 py-2 text-sm text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors font-medium"
+                          >
+                            <Icons.Edit />
+                            <span className="hidden sm:inline">Edit</span>
+                          </button>
+                        </Can>
+                        <Can entity="items" action="delete">
+                          <button
+                            onClick={() => handleDeleteConfirm(item)}
+                            className="flex items-center gap-1.5 px-3 py-2 text-sm text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors font-medium"
+                          >
+                            <Icons.Trash />
+                            <span className="hidden sm:inline">Delete</span>
+                          </button>
+                        </Can>
                       </div>
                     </div>
                   </div>
@@ -816,12 +827,16 @@ export default function ItemsPage() {
                       {item.isVisible ? <><Icons.Eye /> Visible</> : <><Icons.EyeOff /> Hidden</>}
                     </button>
                     <div className="flex gap-2">
-                      <button onClick={() => handleEdit(item)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg">
-                        <Icons.Edit />
-                      </button>
-                      <button onClick={() => handleDeleteConfirm(item)} className="p-2 text-red-600 hover:bg-red-50 rounded-lg">
-                        <Icons.Trash />
-                      </button>
+                      <Can entity="items" action="update">
+                        <button onClick={() => handleEdit(item)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg">
+                          <Icons.Edit />
+                        </button>
+                      </Can>
+                      <Can entity="items" action="delete">
+                        <button onClick={() => handleDeleteConfirm(item)} className="p-2 text-red-600 hover:bg-red-50 rounded-lg">
+                          <Icons.Trash />
+                        </button>
+                      </Can>
                     </div>
                   </div>
                 </div>
@@ -831,5 +846,6 @@ export default function ItemsPage() {
         )}
       </main>
     </div>
+    </RequirePermission>
   );
 }

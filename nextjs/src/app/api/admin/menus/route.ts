@@ -1,13 +1,12 @@
 import { NextResponse } from 'next/server';
-import { getRestaurantSession } from '@/lib/restaurant-auth';
 import { prisma } from '@/lib/prisma';
+import { requirePermission } from '@/lib/rbac';
 
 export async function GET(req: Request) {
   try {
-    const session = await getRestaurantSession();
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const guard = await requirePermission('menu.read');
+    if (!guard.authorized) return guard.response;
+    const session = guard.user!;
 
     const { searchParams } = new URL(req.url);
     const brandId = searchParams.get('brandId');
@@ -40,10 +39,9 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const session = await getRestaurantSession();
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const guard = await requirePermission('menu.create');
+    if (!guard.authorized) return guard.response;
+    const session = guard.user!;
 
     const { brandId, code, translations, currency, priceTaxPolicy, defaultLocale } = await req.json();
 

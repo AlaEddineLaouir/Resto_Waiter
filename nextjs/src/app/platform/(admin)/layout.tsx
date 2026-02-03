@@ -61,6 +61,8 @@ export default function PlatformLayout({
     { href: '/platform/dashboard', label: 'Dashboard', icon: '📊' },
     { href: '/platform/restaurants', label: 'Restaurants', icon: '🍽️' },
     { href: '/platform/plans', label: 'Plans', icon: '💳' },
+    { href: '/platform/users', label: 'Users', icon: '👥' },
+    { href: '/platform/roles', label: 'Roles & Permissions', icon: '🔐' },
   ];
 
   return (

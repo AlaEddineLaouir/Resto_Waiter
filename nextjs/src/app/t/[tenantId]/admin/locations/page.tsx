@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import LocationMenuTree from '@/components/LocationMenuTree';
+import { usePermissions, RequirePermission, Can } from '@/lib/permissions';
 
 interface Brand {
   id: string;
@@ -225,6 +226,7 @@ export default function LocationsPage() {
   }
 
   return (
+    <RequirePermission entity="locations" action="read">
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -234,6 +236,7 @@ export default function LocationsPage() {
             Manage your locations and activate menus per location
           </p>
         </div>
+        <Can entity="locations" action="create">
         <button
           onClick={() => { setShowForm(true); setEditingId(null); resetForm(); }}
           className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2.5 rounded-lg font-medium hover:bg-indigo-700 transition-colors"
@@ -241,6 +244,7 @@ export default function LocationsPage() {
           {Icons.plus}
           Add Location
         </button>
+        </Can>
       </div>
 
       {/* Alerts */}
@@ -394,5 +398,6 @@ export default function LocationsPage() {
         onBulkActivate={handleBulkActivateMenus}
       />
     </div>
+    </RequirePermission>
   );
 }

@@ -90,6 +90,7 @@ async function main() {
     data: {
       tenantId: tenant.id,
       brandId: brand.id,
+      slug: 'amsterdam-city-center',
       name: 'Amsterdam City Center',
       addressLine1: 'Damrak 123',
       city: 'Amsterdam',

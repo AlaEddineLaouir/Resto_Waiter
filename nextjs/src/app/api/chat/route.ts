@@ -193,7 +193,7 @@ Remember: Format responses cleanly without markdown table syntax (no | pipes) an
     // The frontend includes a welcome message that breaks alternation, so we need to rebuild
     const conversationMessages: { role: string; content: string }[] = [];
     
-    console.log('[Chat] Raw messages received:', JSON.stringify(messages.map(m => ({ role: m.role, content: m.content?.substring(0, 50) }))));
+    console.log('[Chat] Raw messages received:', JSON.stringify(messages.map((m: { role: string; content?: string }) => ({ role: m.role, content: m.content?.substring(0, 50) }))));
     
     for (const m of messages) {
       // Skip empty messages

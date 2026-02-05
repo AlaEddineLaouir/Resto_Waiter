@@ -33,6 +33,15 @@ interface DietaryFlag {
 interface Ingredient {
   id: string;
   name: string;
+  isAllergen?: boolean;
+  allergenCode?: string | null;
+}
+
+interface ItemIngredientEntry {
+  ingredientId: string;
+  quantity: string;
+  unit: string;
+  isOptional: boolean;
 }
 
 interface Item {
@@ -55,7 +64,7 @@ interface Item {
   } | null;
   allergens: { allergenCode: string; allergen: Allergen }[];
   dietaryFlags: { dietaryFlagCode: string; dietaryFlag: DietaryFlag }[];
-  ingredients: { ingredientId: string; ingredient: Ingredient }[];
+  ingredients: { ingredientId: string; ingredient: Ingredient; quantity?: string | null; unit?: string | null; isOptional?: boolean }[];
   menuItems?: { menuId: string; displayOrder: number }[];
 }
 
@@ -204,7 +213,7 @@ export default function ItemsPage() {
     calories: '',
     allergenCodes: [] as string[],
     dietaryFlagCodes: [] as string[],
-    ingredientIds: [] as string[],
+    itemIngredients: [] as ItemIngredientEntry[],
   });
 
   // Confirmation modal
@@ -265,6 +274,7 @@ export default function ItemsPage() {
           currency: formData.currency,
           allergens: formData.allergenCodes,
           dietaryFlags: formData.dietaryFlagCodes,
+          ingredients: formData.itemIngredients.filter(i => i.ingredientId), // Send ingredients with quantity/unit
         }),
       });
 
@@ -290,7 +300,12 @@ export default function ItemsPage() {
       calories: item.calories?.toString() || '',
       allergenCodes: (item.allergens || []).map((a) => a.allergenCode),
       dietaryFlagCodes: (item.dietaryFlags || []).map((d) => d.dietaryFlagCode),
-      ingredientIds: (item.ingredients || []).map((i) => i.ingredientId),
+      itemIngredients: (item.ingredients || []).map((i) => ({
+        ingredientId: i.ingredientId,
+        quantity: i.quantity || '',
+        unit: i.unit || '',
+        isOptional: i.isOptional || false,
+      })),
     });
     setEditingId(item.id);
     setShowForm(true);
@@ -343,7 +358,7 @@ export default function ItemsPage() {
       calories: '',
       allergenCodes: [],
       dietaryFlagCodes: [],
-      ingredientIds: [],
+      itemIngredients: [],
     });
     setEditingId(null);
     setShowForm(false);
@@ -629,6 +644,103 @@ export default function ItemsPage() {
                   </div>
                 </div>
 
+                {/* Ingredients - Dynamic Section */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-sm font-medium text-gray-700">Ingredients 🥗</label>
+                    <button
+                      type="button"
+                      onClick={() => setFormData({
+                        ...formData,
+                        itemIngredients: [...formData.itemIngredients, { ingredientId: '', quantity: '', unit: '', isOptional: false }]
+                      })}
+                      className="text-sm text-teal-600 hover:text-teal-700 font-medium flex items-center gap-1"
+                    >
+                      <Icons.Plus /> Add Ingredient
+                    </button>
+                  </div>
+                  
+                  {formData.itemIngredients.length === 0 ? (
+                    <div className="border border-dashed border-gray-300 rounded-lg p-4 text-center text-gray-500 text-sm">
+                      No ingredients added yet. Click &quot;Add Ingredient&quot; to start.
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {formData.itemIngredients.map((ing, index) => (
+                        <div key={index} className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                          <select
+                            value={ing.ingredientId}
+                            onChange={(e) => {
+                              const updated = [...formData.itemIngredients];
+                              updated[index].ingredientId = e.target.value;
+                              setFormData({ ...formData, itemIngredients: updated });
+                            }}
+                            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 text-sm"
+                          >
+                            <option value="">Select ingredient...</option>
+                            {ingredients.map((i) => (
+                              <option key={i.id} value={i.id}>
+                                {i.name} {i.isAllergen ? '⚠️' : ''}
+                              </option>
+                            ))}
+                          </select>
+                          <input
+                            type="text"
+                            placeholder="Qty"
+                            value={ing.quantity}
+                            onChange={(e) => {
+                              const updated = [...formData.itemIngredients];
+                              updated[index].quantity = e.target.value;
+                              setFormData({ ...formData, itemIngredients: updated });
+                            }}
+                            className="w-20 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 text-sm"
+                          />
+                          <input
+                            type="text"
+                            placeholder="Unit"
+                            value={ing.unit}
+                            onChange={(e) => {
+                              const updated = [...formData.itemIngredients];
+                              updated[index].unit = e.target.value;
+                              setFormData({ ...formData, itemIngredients: updated });
+                            }}
+                            className="w-20 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 text-sm"
+                          />
+                          <label className="flex items-center gap-1 text-sm text-gray-600 cursor-pointer whitespace-nowrap">
+                            <input
+                              type="checkbox"
+                              checked={ing.isOptional}
+                              onChange={(e) => {
+                                const updated = [...formData.itemIngredients];
+                                updated[index].isOptional = e.target.checked;
+                                setFormData({ ...formData, itemIngredients: updated });
+                              }}
+                              className="w-4 h-4 text-teal-600 rounded"
+                            />
+                            Optional
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const updated = formData.itemIngredients.filter((_, i) => i !== index);
+                              setFormData({ ...formData, itemIngredients: updated });
+                            }}
+                            className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                          >
+                            <Icons.Trash />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  
+                  {ingredients.length === 0 && (
+                    <p className="mt-2 text-xs text-amber-600">
+                      💡 No ingredients available. <Link href={`/t/${tenantId}/admin/ingredients`} className="underline">Create ingredients first</Link>.
+                    </p>
+                  )}
+                </div>
+
                 {/* Visibility Toggle */}
                 <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
                   <label className="relative inline-flex items-center cursor-pointer">
@@ -743,6 +855,23 @@ export default function ItemsPage() {
                             </span>
                           )}
                         </div>
+
+                        {/* Ingredients */}
+                        {(item.ingredients || []).length > 0 && (
+                          <div className="mt-2 pt-2 border-t border-gray-100">
+                            <p className="text-xs text-gray-500">
+                              <span className="font-medium">🥗 Ingredients: </span>
+                              {item.ingredients.map((ing, idx) => (
+                                <span key={ing.ingredientId}>
+                                  {ing.ingredient.name}
+                                  {ing.quantity && ` (${ing.quantity}${ing.unit ? ' ' + ing.unit : ''})`}
+                                  {ing.isOptional && <span className="text-gray-400 italic"> optional</span>}
+                                  {idx < item.ingredients.length - 1 ? ', ' : ''}
+                                </span>
+                              ))}
+                            </p>
+                          </div>
+                        )}
                       </div>
 
                       {/* Actions */}
@@ -799,7 +928,7 @@ export default function ItemsPage() {
 
                   <div className="text-xs text-gray-500 mb-3">{getSectionLabel(item.section)}</div>
 
-                  <div className="flex flex-wrap gap-1 mb-4">
+                  <div className="flex flex-wrap gap-1 mb-3">
                     {(item.dietaryFlags || []).map((d) => (
                       <span key={d.dietaryFlagCode} className="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full">
                         {d.dietaryFlag?.translations?.[0]?.name || d.dietaryFlagCode}
@@ -816,6 +945,14 @@ export default function ItemsPage() {
                       </span>
                     )}
                   </div>
+
+                  {/* Ingredients in Grid View */}
+                  {(item.ingredients || []).length > 0 && (
+                    <div className="mb-3 text-xs text-gray-500 line-clamp-2">
+                      <span className="font-medium">🥗 </span>
+                      {item.ingredients.map((ing) => ing.ingredient.name).join(', ')}
+                    </div>
+                  )}
 
                   <div className="flex items-center justify-between pt-3 border-t">
                     <button

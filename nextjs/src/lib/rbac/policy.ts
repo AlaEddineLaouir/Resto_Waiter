@@ -203,21 +203,21 @@ export function canAccessLocation(user: AuthUser, locationId: string): boolean {
  * Check if user can manage menus (create, update, publish)
  */
 export function canManageMenu(user: AuthUser): boolean {
-  return can(user, 'menu.update');
+  return can(user, 'menus.update');
 }
 
 /**
  * Check if user can publish menus
  */
 export function canPublishMenu(user: AuthUser): boolean {
-  return can(user, 'menu.publish');
+  return can(user, 'menus.publish');
 }
 
 /**
  * Check if user can manage locations (create, update, delete)
  */
 export function canManageLocations(user: AuthUser): boolean {
-  return can(user, 'location.update');
+  return can(user, 'locations.update');
 }
 
 /**
@@ -231,5 +231,5 @@ export function canManageStaff(user: AuthUser): boolean {
  * Check if user can view analytics
  */
 export function canViewAnalytics(user: AuthUser): boolean {
-  return can(user, 'analytics.view');
+  return can(user, 'analytics.read');
 }

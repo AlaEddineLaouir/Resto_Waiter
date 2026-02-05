@@ -13,7 +13,7 @@ function serializeBigInt<T>(obj: T): T {
 
 export async function GET(req: Request) {
   try {
-    const guard = await requirePermission('item.read');
+    const guard = await requirePermission('items.read');
     if (!guard.authorized) return guard.response;
     const session = guard.user!;
 
@@ -37,6 +37,7 @@ export async function GET(req: Request) {
               priceBase: true,
               allergens: { include: { allergen: { include: { translations: true } } } },
               dietaryFlags: { include: { dietaryFlag: { include: { translations: true } } } },
+              ingredients: { include: { ingredient: true } },
               imageAsset: true,
             },
           },
@@ -66,6 +67,7 @@ export async function GET(req: Request) {
           priceBase: true,
           allergens: { include: { allergen: { include: { translations: true } } } },
           dietaryFlags: { include: { dietaryFlag: { include: { translations: true } } } },
+          ingredients: { include: { ingredient: true } },
           imageAsset: true,
           menuItems: {
             include: {
@@ -90,7 +92,7 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const guard = await requirePermission('item.create');
+    const guard = await requirePermission('items.create');
     if (!guard.authorized) return guard.response;
     const session = guard.user!;
 
@@ -105,6 +107,7 @@ export async function POST(req: Request) {
       calories,
       allergens,
       dietaryFlags,
+      ingredients,
     } = await req.json();
 
     if (!sectionId || !translations?.length) {
@@ -177,6 +180,20 @@ export async function POST(req: Request) {
         });
       }
 
+      // Create ingredient links
+      if (ingredients?.length) {
+        await tx.itemIngredient.createMany({
+          data: ingredients.map((ing: { ingredientId: string; quantity?: string; unit?: string; isOptional?: boolean }) => ({
+            tenantId: session.tenantId,
+            itemId: newItem.id,
+            ingredientId: ing.ingredientId,
+            quantity: ing.quantity || null,
+            unit: ing.unit || null,
+            isOptional: ing.isOptional || false,
+          })),
+        });
+      }
+
       // If menuId provided, link item to menu via join table
       if (menuId) {
         // Get max display order for items in this section in this menu
@@ -208,6 +225,7 @@ export async function POST(req: Request) {
         priceBase: true,
         allergens: { include: { allergen: true } },
         dietaryFlags: { include: { dietaryFlag: true } },
+        ingredients: { include: { ingredient: true } },
       },
     });
 

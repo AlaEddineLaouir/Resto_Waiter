@@ -3,56 +3,60 @@
  * 
  * Format: "resource.action"
  * This is the industry standard for RBAC systems.
+ * Uses plural resource names to match database and navigation.
  */
 
+// Dashboard permissions
+export const DASHBOARD_READ = 'dashboard.read';
+
 // Menu permissions
-export const MENU_READ = 'menu.read';
-export const MENU_CREATE = 'menu.create';
-export const MENU_UPDATE = 'menu.update';
-export const MENU_DELETE = 'menu.delete';
-export const MENU_PUBLISH = 'menu.publish';
+export const MENU_READ = 'menus.read';
+export const MENU_CREATE = 'menus.create';
+export const MENU_UPDATE = 'menus.update';
+export const MENU_DELETE = 'menus.delete';
+export const MENU_PUBLISH = 'menus.publish';
 
 // Item permissions
-export const ITEM_READ = 'item.read';
-export const ITEM_CREATE = 'item.create';
-export const ITEM_UPDATE = 'item.update';
-export const ITEM_DELETE = 'item.delete';
+export const ITEM_READ = 'items.read';
+export const ITEM_CREATE = 'items.create';
+export const ITEM_UPDATE = 'items.update';
+export const ITEM_DELETE = 'items.delete';
 
 // Section permissions
-export const SECTION_READ = 'section.read';
-export const SECTION_CREATE = 'section.create';
-export const SECTION_UPDATE = 'section.update';
-export const SECTION_DELETE = 'section.delete';
+export const SECTION_READ = 'sections.read';
+export const SECTION_CREATE = 'sections.create';
+export const SECTION_UPDATE = 'sections.update';
+export const SECTION_DELETE = 'sections.delete';
 
 // Brand permissions
-export const BRAND_READ = 'brand.read';
-export const BRAND_CREATE = 'brand.create';
-export const BRAND_UPDATE = 'brand.update';
-export const BRAND_DELETE = 'brand.delete';
+export const BRAND_READ = 'brands.read';
+export const BRAND_CREATE = 'brands.create';
+export const BRAND_UPDATE = 'brands.update';
+export const BRAND_DELETE = 'brands.delete';
 
 // Location permissions
-export const LOCATION_READ = 'location.read';
-export const LOCATION_CREATE = 'location.create';
-export const LOCATION_UPDATE = 'location.update';
-export const LOCATION_DELETE = 'location.delete';
+export const LOCATION_READ = 'locations.read';
+export const LOCATION_CREATE = 'locations.create';
+export const LOCATION_UPDATE = 'locations.update';
+export const LOCATION_DELETE = 'locations.delete';
 
 // Publication permissions
-export const PUBLICATION_READ = 'publication.read';
-export const PUBLICATION_CREATE = 'publication.create';
-export const PUBLICATION_UPDATE = 'publication.update';
-export const PUBLICATION_DELETE = 'publication.delete';
+export const PUBLICATION_READ = 'publications.read';
+export const PUBLICATION_CREATE = 'publications.create';
+export const PUBLICATION_UPDATE = 'publications.update';
+export const PUBLICATION_DELETE = 'publications.delete';
 
 // Ingredient permissions
-export const INGREDIENT_READ = 'ingredient.read';
-export const INGREDIENT_CREATE = 'ingredient.create';
-export const INGREDIENT_UPDATE = 'ingredient.update';
-export const INGREDIENT_DELETE = 'ingredient.delete';
+export const INGREDIENT_READ = 'ingredients.read';
+export const INGREDIENT_CREATE = 'ingredients.create';
+export const INGREDIENT_UPDATE = 'ingredients.update';
+export const INGREDIENT_DELETE = 'ingredients.delete';
 
 // Option group permissions
-export const OPTION_READ = 'option.read';
-export const OPTION_CREATE = 'option.create';
-export const OPTION_UPDATE = 'option.update';
-export const OPTION_DELETE = 'option.delete';
+export const OPTION_READ = 'options.read';
+export const OPTION_CREATE = 'options.create';
+export const OPTION_UPDATE = 'options.update';
+export const OPTION_DELETE = 'options.delete';
 
 // Staff/User management permissions
 export const STAFF_READ = 'staff.read';
@@ -60,16 +64,16 @@ export const STAFF_CREATE = 'staff.create';
 export const STAFF_UPDATE = 'staff.update';
 export const STAFF_DELETE = 'staff.delete';
 
-// Dashboard & Analytics
-export const DASHBOARD_VIEW = 'dashboard.view';
-export const ANALYTICS_VIEW = 'analytics.view';
+// Analytics
+export const ANALYTICS_VIEW = 'analytics.read';
 
 // Allergens & Dietary (read-only reference data)
-export const ALLERGEN_READ = 'allergen.read';
+export const ALLERGEN_READ = 'allergens.read';
 export const DIETARY_READ = 'dietary.read';
 
 // All permission keys as a type
 export type PermissionKey =
+  | typeof DASHBOARD_READ
   | typeof MENU_READ | typeof MENU_CREATE | typeof MENU_UPDATE | typeof MENU_DELETE | typeof MENU_PUBLISH
   | typeof ITEM_READ | typeof ITEM_CREATE | typeof ITEM_UPDATE | typeof ITEM_DELETE
   | typeof SECTION_READ | typeof SECTION_CREATE | typeof SECTION_UPDATE | typeof SECTION_DELETE
@@ -79,5 +83,5 @@ export type PermissionKey =
   | typeof INGREDIENT_READ | typeof INGREDIENT_CREATE | typeof INGREDIENT_UPDATE | typeof INGREDIENT_DELETE
   | typeof OPTION_READ | typeof OPTION_CREATE | typeof OPTION_UPDATE | typeof OPTION_DELETE
   | typeof STAFF_READ | typeof STAFF_CREATE | typeof STAFF_UPDATE | typeof STAFF_DELETE
-  | typeof DASHBOARD_VIEW | typeof ANALYTICS_VIEW
+  | typeof ANALYTICS_VIEW
   | typeof ALLERGEN_READ | typeof DIETARY_READ;

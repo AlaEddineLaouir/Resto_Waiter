@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { getRestaurantSession } from '@/lib/restaurant-auth';
 import { prisma } from '@/lib/prisma';
+import { requirePermission } from '@/lib/rbac';
 
 // Helper to convert BigInt to Number for JSON serialization
 function serializeBigInt<T>(obj: T): T {
@@ -17,10 +17,9 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getRestaurantSession();
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const guard = await requirePermission('menus.read');
+    if (!guard.authorized) return guard.response;
+    const session = guard.user!;
 
     const { id: menuId } = await params;
 
@@ -101,10 +100,9 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getRestaurantSession();
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const guard = await requirePermission('menus.update');
+    if (!guard.authorized) return guard.response;
+    const session = guard.user!;
 
     const { id: menuId } = await params;
     const { lineType, sectionId, itemId, parentLineId, displayOrder } = await req.json();

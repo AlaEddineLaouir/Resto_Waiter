@@ -59,13 +59,20 @@ export async function POST(req: Request) {
       );
     }
 
-    // Create token
+    // Create token - include custom permissions if set
+    const userPermissions = admin.permissions as string[] | null;
+    console.log('[LOGIN] Creating token for:', admin.email, {
+      role: admin.role,
+      hasCustomPermissions: !!(userPermissions && userPermissions.length > 0),
+      customPermissions: userPermissions,
+    });
     const token = await createRestaurantToken({
       id: admin.id,
       email: admin.email,
       tenantId: tenant.id,
       tenantSlug: tenant.slug,
       role: admin.role,
+      permissions: userPermissions && userPermissions.length > 0 ? userPermissions : undefined,
     });
 
     // Set cookie - path must be / for API routes to receive it

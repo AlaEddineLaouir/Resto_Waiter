@@ -8,6 +8,8 @@
 import { TenantUserRole } from '@prisma/client';
 import {
   PermissionKey,
+  // Dashboard
+  DASHBOARD_READ,
   // Menu
   MENU_READ, MENU_CREATE, MENU_UPDATE, MENU_DELETE, MENU_PUBLISH,
   // Item
@@ -26,8 +28,8 @@ import {
   OPTION_READ, OPTION_CREATE, OPTION_UPDATE, OPTION_DELETE,
   // Staff
   STAFF_READ, STAFF_CREATE, STAFF_UPDATE, STAFF_DELETE,
-  // Dashboard & Analytics
-  DASHBOARD_VIEW, ANALYTICS_VIEW,
+  // Analytics
+  ANALYTICS_VIEW,
   // Reference data
   ALLERGEN_READ, DIETARY_READ,
 } from './permissions';
@@ -82,7 +84,7 @@ export const ROLE_PERMISSIONS: Record<TenantUserRole, PermissionKey[]> = {
     // Staff management
     STAFF_READ, STAFF_CREATE, STAFF_UPDATE, STAFF_DELETE,
     // Dashboard & Analytics
-    DASHBOARD_VIEW, ANALYTICS_VIEW,
+    DASHBOARD_READ, ANALYTICS_VIEW,
     // Reference data
     ALLERGEN_READ, DIETARY_READ,
   ],
@@ -108,7 +110,7 @@ export const ROLE_PERMISSIONS: Record<TenantUserRole, PermissionKey[]> = {
     // Staff management (limited)
     STAFF_READ, STAFF_CREATE, STAFF_UPDATE,
     // Dashboard & Analytics
-    DASHBOARD_VIEW, ANALYTICS_VIEW,
+    DASHBOARD_READ, ANALYTICS_VIEW,
     // Reference data
     ALLERGEN_READ, DIETARY_READ,
   ],
@@ -130,7 +132,7 @@ export const ROLE_PERMISSIONS: Record<TenantUserRole, PermissionKey[]> = {
     // Options
     OPTION_READ, OPTION_CREATE, OPTION_UPDATE,
     // Dashboard
-    DASHBOARD_VIEW,
+    DASHBOARD_READ,
     // Reference data
     ALLERGEN_READ, DIETARY_READ,
   ],
@@ -146,7 +148,7 @@ export const ROLE_PERMISSIONS: Record<TenantUserRole, PermissionKey[]> = {
     // Locations (read only)
     LOCATION_READ,
     // Dashboard
-    DASHBOARD_VIEW,
+    DASHBOARD_READ,
     // Reference data (for customer questions about allergens)
     ALLERGEN_READ, DIETARY_READ,
   ],

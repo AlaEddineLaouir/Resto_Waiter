@@ -328,6 +328,18 @@ export default function TenantUsersPage() {
   const openEditModal = (user: User) => {
     setEditingUser(user);
     const userRole = getRoleBySlug(user.role);
+    console.log('[DEBUG] openEditModal:', {
+      userRole: user.role,
+      foundRole: userRole?.slug,
+      userPermissions: user.permissions,
+      rolePermissionKeys: userRole?.permissionKeys,
+      systemRolesCount: systemRoles.length,
+    });
+    // Use user's custom permissions if they have any, otherwise use role defaults
+    const userPermissions = user.permissions && user.permissions.length > 0 
+      ? user.permissions 
+      : userRole?.permissionKeys || [];
+    console.log('[DEBUG] Final permissions:', userPermissions);
     setFormData({
       email: user.email,
       username: user.username,
@@ -336,7 +348,7 @@ export default function TenantUsersPage() {
       phone: (user as unknown as { phone?: string }).phone || '',
       notes: (user as unknown as { notes?: string }).notes || '',
       role: user.role,
-      permissions: user.permissions || userRole?.permissionKeys || [],
+      permissions: userPermissions,
       locationIds: user.locationIds || [],
       isActive: user.isActive,
     });

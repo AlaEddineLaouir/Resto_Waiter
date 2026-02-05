@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { getRestaurantSession } from '@/lib/restaurant-auth';
 import { prisma } from '@/lib/prisma';
+import { requirePermission } from '@/lib/rbac';
 
 // PATCH - Toggle isEnabled on a line
 // - Section: toggles all child item lines in this menu only
@@ -10,10 +10,9 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string; lineId: string }> }
 ) {
   try {
-    const session = await getRestaurantSession();
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const guard = await requirePermission('menus.update');
+    if (!guard.authorized) return guard.response;
+    const session = guard.user!;
 
     const { id: menuId, lineId } = await params;
 

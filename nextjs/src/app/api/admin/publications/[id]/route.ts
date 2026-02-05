@@ -12,7 +12,7 @@ interface RouteParams {
  */
 export async function PATCH(req: Request, { params }: RouteParams) {
   try {
-    const guard = await requirePermission('publication.update');
+    const guard = await requirePermission('publications.update');
     if (!guard.authorized) return guard.response;
     const session = guard.user!;
 
@@ -87,7 +87,7 @@ export async function PATCH(req: Request, { params }: RouteParams) {
  */
 export async function DELETE(req: Request, { params }: RouteParams) {
   try {
-    const guard = await requirePermission('publication.delete');
+    const guard = await requirePermission('publications.delete');
     if (!guard.authorized) return guard.response;
     const session = guard.user!;
 

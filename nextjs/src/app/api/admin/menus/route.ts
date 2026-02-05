@@ -4,7 +4,7 @@ import { requirePermission } from '@/lib/rbac';
 
 export async function GET(req: Request) {
   try {
-    const guard = await requirePermission('menu.read');
+    const guard = await requirePermission('menus.read');
     if (!guard.authorized) return guard.response;
     const session = guard.user!;
 
@@ -39,7 +39,7 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const guard = await requirePermission('menu.create');
+    const guard = await requirePermission('menus.create');
     if (!guard.authorized) return guard.response;
     const session = guard.user!;
 

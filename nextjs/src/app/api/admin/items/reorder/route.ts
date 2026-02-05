@@ -18,7 +18,7 @@ function serializeBigInt<T>(obj: T): T {
  */
 export async function PATCH(req: Request) {
   try {
-    const guard = await requirePermission('item.update');
+    const guard = await requirePermission('items.update');
     if (!guard.authorized) return guard.response;
     const session = guard.user!;
 

@@ -5,7 +5,7 @@ import { requirePermission } from '@/lib/rbac';
 // Get all allergens (global vocabulary)
 export async function GET(req: Request) {
   try {
-    const guard = await requirePermission('allergen.read');
+    const guard = await requirePermission('allergens.read');
     if (!guard.authorized) return guard.response;
 
     const { searchParams } = new URL(req.url);

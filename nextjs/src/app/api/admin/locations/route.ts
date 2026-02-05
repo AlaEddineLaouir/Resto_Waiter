@@ -4,7 +4,7 @@ import { requirePermission } from '@/lib/rbac';
 
 export async function GET(req: Request) {
   try {
-    const guard = await requirePermission('location.read');
+    const guard = await requirePermission('locations.read');
     if (!guard.authorized) return guard.response;
     const session = guard.user!;
 
@@ -32,7 +32,7 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const guard = await requirePermission('location.create');
+    const guard = await requirePermission('locations.create');
     if (!guard.authorized) return guard.response;
     const session = guard.user!;
 

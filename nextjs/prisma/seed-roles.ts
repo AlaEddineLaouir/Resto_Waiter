@@ -8,12 +8,57 @@ const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
 const permissions = [
-  // Menu permissions
-  { key: 'menu.read', label: 'View Menus', description: 'Can view menu items and sections', category: 'Menu', sortOrder: 1 },
-  { key: 'menu.create', label: 'Create Menu Items', description: 'Can create new menu items', category: 'Menu', sortOrder: 2 },
-  { key: 'menu.update', label: 'Edit Menu Items', description: 'Can modify existing menu items', category: 'Menu', sortOrder: 3 },
-  { key: 'menu.delete', label: 'Delete Menu Items', description: 'Can remove menu items', category: 'Menu', sortOrder: 4 },
-  { key: 'menu.publish', label: 'Publish Menus', description: 'Can publish menu changes', category: 'Menu', sortOrder: 5 },
+  // Dashboard permissions
+  { key: 'dashboard.read', label: 'View Dashboard', description: 'Can access the dashboard overview', category: 'Dashboard', sortOrder: 1 },
+  
+  // Menu permissions (plural to match navigation)
+  { key: 'menus.read', label: 'View Menus', description: 'Can view menus', category: 'Menu', sortOrder: 1 },
+  { key: 'menus.create', label: 'Create Menus', description: 'Can create new menus', category: 'Menu', sortOrder: 2 },
+  { key: 'menus.update', label: 'Edit Menus', description: 'Can modify existing menus', category: 'Menu', sortOrder: 3 },
+  { key: 'menus.delete', label: 'Delete Menus', description: 'Can remove menus', category: 'Menu', sortOrder: 4 },
+  { key: 'menus.publish', label: 'Publish Menus', description: 'Can publish menu changes', category: 'Menu', sortOrder: 5 },
+  
+  // Sections permissions
+  { key: 'sections.read', label: 'View Sections', description: 'Can view menu sections', category: 'Sections', sortOrder: 1 },
+  { key: 'sections.create', label: 'Create Sections', description: 'Can create menu sections', category: 'Sections', sortOrder: 2 },
+  { key: 'sections.update', label: 'Edit Sections', description: 'Can modify menu sections', category: 'Sections', sortOrder: 3 },
+  { key: 'sections.delete', label: 'Delete Sections', description: 'Can remove menu sections', category: 'Sections', sortOrder: 4 },
+  
+  // Items permissions
+  { key: 'items.read', label: 'View Items', description: 'Can view menu items', category: 'Items', sortOrder: 1 },
+  { key: 'items.create', label: 'Create Items', description: 'Can create menu items', category: 'Items', sortOrder: 2 },
+  { key: 'items.update', label: 'Edit Items', description: 'Can modify menu items', category: 'Items', sortOrder: 3 },
+  { key: 'items.delete', label: 'Delete Items', description: 'Can remove menu items', category: 'Items', sortOrder: 4 },
+  
+  // Ingredients permissions
+  { key: 'ingredients.read', label: 'View Ingredients', description: 'Can view ingredients', category: 'Ingredients', sortOrder: 1 },
+  { key: 'ingredients.create', label: 'Create Ingredients', description: 'Can create ingredients', category: 'Ingredients', sortOrder: 2 },
+  { key: 'ingredients.update', label: 'Edit Ingredients', description: 'Can modify ingredients', category: 'Ingredients', sortOrder: 3 },
+  { key: 'ingredients.delete', label: 'Delete Ingredients', description: 'Can remove ingredients', category: 'Ingredients', sortOrder: 4 },
+  
+  // Option Groups permissions
+  { key: 'options.read', label: 'View Option Groups', description: 'Can view option groups', category: 'Option Groups', sortOrder: 1 },
+  { key: 'options.create', label: 'Create Option Groups', description: 'Can create option groups', category: 'Option Groups', sortOrder: 2 },
+  { key: 'options.update', label: 'Edit Option Groups', description: 'Can modify option groups', category: 'Option Groups', sortOrder: 3 },
+  { key: 'options.delete', label: 'Delete Option Groups', description: 'Can remove option groups', category: 'Option Groups', sortOrder: 4 },
+  
+  // Brands permissions
+  { key: 'brands.read', label: 'View Brands', description: 'Can view brands', category: 'Brands', sortOrder: 1 },
+  { key: 'brands.create', label: 'Create Brands', description: 'Can create brands', category: 'Brands', sortOrder: 2 },
+  { key: 'brands.update', label: 'Edit Brands', description: 'Can modify brands', category: 'Brands', sortOrder: 3 },
+  { key: 'brands.delete', label: 'Delete Brands', description: 'Can remove brands', category: 'Brands', sortOrder: 4 },
+  
+  // Locations permissions
+  { key: 'locations.read', label: 'View Locations', description: 'Can view locations', category: 'Locations', sortOrder: 1 },
+  { key: 'locations.create', label: 'Add Locations', description: 'Can add new locations', category: 'Locations', sortOrder: 2 },
+  { key: 'locations.update', label: 'Manage Locations', description: 'Can edit locations', category: 'Locations', sortOrder: 3 },
+  { key: 'locations.delete', label: 'Remove Locations', description: 'Can remove locations', category: 'Locations', sortOrder: 4 },
+  
+  // Users/Staff permissions
+  { key: 'staff.read', label: 'View Staff', description: 'Can view staff list', category: 'Staff', sortOrder: 1 },
+  { key: 'staff.create', label: 'Add Staff', description: 'Can add new staff members', category: 'Staff', sortOrder: 2 },
+  { key: 'staff.update', label: 'Manage Staff', description: 'Can edit staff members', category: 'Staff', sortOrder: 3 },
+  { key: 'staff.delete', label: 'Remove Staff', description: 'Can remove staff members', category: 'Staff', sortOrder: 4 },
   
   // Orders permissions
   { key: 'orders.read', label: 'View Orders', description: 'Can view order history', category: 'Orders', sortOrder: 1 },
@@ -28,18 +73,6 @@ const permissions = [
   // Settings permissions
   { key: 'settings.read', label: 'View Settings', description: 'Can view restaurant settings', category: 'Settings', sortOrder: 1 },
   { key: 'settings.update', label: 'Manage Settings', description: 'Can modify restaurant settings', category: 'Settings', sortOrder: 2 },
-  
-  // Staff permissions
-  { key: 'staff.read', label: 'View Staff', description: 'Can view staff list', category: 'Staff', sortOrder: 1 },
-  { key: 'staff.create', label: 'Add Staff', description: 'Can add new staff members', category: 'Staff', sortOrder: 2 },
-  { key: 'staff.update', label: 'Manage Staff', description: 'Can edit staff members', category: 'Staff', sortOrder: 3 },
-  { key: 'staff.delete', label: 'Remove Staff', description: 'Can remove staff members', category: 'Staff', sortOrder: 4 },
-  
-  // Locations permissions
-  { key: 'locations.read', label: 'View Locations', description: 'Can view locations', category: 'Locations', sortOrder: 1 },
-  { key: 'locations.create', label: 'Add Locations', description: 'Can add new locations', category: 'Locations', sortOrder: 2 },
-  { key: 'locations.update', label: 'Manage Locations', description: 'Can edit locations', category: 'Locations', sortOrder: 3 },
-  { key: 'locations.delete', label: 'Remove Locations', description: 'Can remove locations', category: 'Locations', sortOrder: 4 },
 ];
 
 const roles = [
@@ -62,12 +95,18 @@ const roles = [
     level: 80,
     isDefault: false,
     permissions: [
-      'menu.read', 'menu.create', 'menu.update', 'menu.delete', 'menu.publish',
+      'dashboard.read',
+      'menus.read', 'menus.create', 'menus.update', 'menus.delete', 'menus.publish',
+      'sections.read', 'sections.create', 'sections.update', 'sections.delete',
+      'items.read', 'items.create', 'items.update', 'items.delete',
+      'ingredients.read', 'ingredients.create', 'ingredients.update',
+      'options.read', 'options.create', 'options.update',
+      'brands.read', 'brands.update',
+      'locations.read', 'locations.update',
+      'staff.read', 'staff.create', 'staff.update',
       'orders.read', 'orders.create', 'orders.update',
       'analytics.read', 'analytics.export',
       'settings.read',
-      'staff.read', 'staff.create', 'staff.update',
-      'locations.read', 'locations.update',
     ],
   },
   {
@@ -79,8 +118,12 @@ const roles = [
     level: 50,
     isDefault: true,
     permissions: [
-      'menu.read', 'menu.create', 'menu.update',
-      'orders.read',
+      'dashboard.read',
+      'menus.read',
+      'sections.read', 'sections.create', 'sections.update',
+      'items.read', 'items.create', 'items.update',
+      'ingredients.read', 'ingredients.create', 'ingredients.update',
+      'options.read',
       'locations.read',
     ],
   },
@@ -93,7 +136,10 @@ const roles = [
     level: 30,
     isDefault: false,
     permissions: [
-      'menu.read',
+      'dashboard.read',
+      'menus.read',
+      'sections.read',
+      'items.read',
       'orders.read', 'orders.create', 'orders.update',
       'locations.read',
     ],
@@ -107,7 +153,9 @@ const roles = [
     level: 20,
     isDefault: false,
     permissions: [
-      'menu.read',
+      'dashboard.read',
+      'items.read',
+      'ingredients.read',
       'orders.read',
     ],
   },

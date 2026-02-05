@@ -7,7 +7,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const guard = await requirePermission('item.read');
+    const guard = await requirePermission('items.read');
     if (!guard.authorized) return guard.response;
     const session = guard.user!;
 
@@ -58,7 +58,7 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const guard = await requirePermission('item.update');
+    const guard = await requirePermission('items.update');
     if (!guard.authorized) return guard.response;
     const session = guard.user!;
 
@@ -74,6 +74,7 @@ export async function PUT(
       isVisible,
       allergens,
       dietaryFlags,
+      ingredients,
     } = await req.json();
 
     const existing = await prisma.item.findFirst({
@@ -86,18 +87,30 @@ export async function PUT(
     }
 
     const item = await prisma.$transaction(async (tx) => {
-      // Update translations
+      // Update translations using upsert to avoid constraint issues
       if (translations?.length > 0) {
-        await tx.itemI18n.deleteMany({ where: { itemId: id } });
-        await tx.itemI18n.createMany({
-          data: translations.map((t: { locale: string; name: string; description?: string }) => ({
-            tenantId: session.tenantId,
-            itemId: id,
-            locale: t.locale,
-            name: t.name,
-            description: t.description,
-          })),
-        });
+        for (const t of translations as { locale: string; name: string; description?: string }[]) {
+          await tx.itemI18n.upsert({
+            where: {
+              tenantId_itemId_locale: {
+                tenantId: session.tenantId,
+                itemId: id,
+                locale: t.locale,
+              },
+            },
+            create: {
+              tenantId: session.tenantId,
+              itemId: id,
+              locale: t.locale,
+              name: t.name,
+              description: t.description,
+            },
+            update: {
+              name: t.name,
+              description: t.description,
+            },
+          });
+        }
       }
 
       // Update price
@@ -119,7 +132,9 @@ export async function PUT(
 
       // Update allergens
       if (allergens) {
-        await tx.itemAllergen.deleteMany({ where: { itemId: id } });
+        // Delete existing and wait for completion
+        const deletedAllergens = await tx.itemAllergen.deleteMany({ where: { itemId: id } });
+        console.log(`Deleted ${deletedAllergens.count} allergens for item ${id}`);
         if (allergens.length > 0) {
           await tx.itemAllergen.createMany({
             data: allergens.map((code: string) => ({
@@ -133,13 +148,32 @@ export async function PUT(
 
       // Update dietary flags
       if (dietaryFlags) {
-        await tx.itemDietaryFlag.deleteMany({ where: { itemId: id } });
+        const deletedFlags = await tx.itemDietaryFlag.deleteMany({ where: { itemId: id } });
+        console.log(`Deleted ${deletedFlags.count} dietary flags for item ${id}`);
         if (dietaryFlags.length > 0) {
           await tx.itemDietaryFlag.createMany({
             data: dietaryFlags.map((code: string) => ({
               tenantId: session.tenantId,
               itemId: id,
               dietaryFlagCode: code,
+            })),
+          });
+        }
+      }
+
+      // Update ingredients
+      if (ingredients) {
+        const deletedIngredients = await tx.itemIngredient.deleteMany({ where: { itemId: id } });
+        console.log(`Deleted ${deletedIngredients.count} ingredients for item ${id}`);
+        if (ingredients.length > 0) {
+          await tx.itemIngredient.createMany({
+            data: ingredients.map((ing: { ingredientId: string; quantity?: string; unit?: string; isOptional?: boolean }) => ({
+              tenantId: session.tenantId,
+              itemId: id,
+              ingredientId: ing.ingredientId,
+              quantity: ing.quantity || null,
+              unit: ing.unit || null,
+              isOptional: ing.isOptional || false,
             })),
           });
         }
@@ -160,6 +194,7 @@ export async function PUT(
           priceBase: true,
           allergens: { include: { allergen: true } },
           dietaryFlags: { include: { dietaryFlag: true } },
+          ingredients: { include: { ingredient: true } },
         },
       });
 
@@ -211,7 +246,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const guard = await requirePermission('item.delete');
+    const guard = await requirePermission('items.delete');
     if (!guard.authorized) return guard.response;
     const session = guard.user!;
 

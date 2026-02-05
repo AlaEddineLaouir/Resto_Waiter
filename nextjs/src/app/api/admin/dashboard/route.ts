@@ -4,7 +4,7 @@ import { requirePermission } from '@/lib/rbac';
 
 export async function GET() {
   try {
-    const guard = await requirePermission('dashboard.view');
+    const guard = await requirePermission('dashboard.read');
     if (!guard.authorized) return guard.response;
     const session = guard.user!;
 

@@ -13,6 +13,7 @@ export interface RestaurantSession {
   tenantId: string;
   tenantSlug: string;
   role: string;
+  permissions?: string[]; // User's custom permissions (if customized from role defaults)
   locationIds?: string[]; // For location-scoped access
 }
 

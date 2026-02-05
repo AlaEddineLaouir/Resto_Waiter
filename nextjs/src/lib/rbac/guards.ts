@@ -11,6 +11,7 @@ import { PermissionKey } from './permissions';
 import { can, canAccessResource, AuthUser, Resource, canManageUser, canAssignRole } from './policy';
 import { getPermissionsForRole } from './roles';
 import { TenantUserRole } from '@prisma/client';
+import { prisma } from '@/lib/prisma';
 
 /**
  * Result of a guard check
@@ -23,6 +24,7 @@ export interface GuardResult {
 
 /**
  * Get the current user with permissions
+ * Fetches permissions dynamically from the database for real-time updates.
  */
 export async function getAuthUser(): Promise<AuthUser | null> {
   const session = await getRestaurantSession();
@@ -31,12 +33,24 @@ export async function getAuthUser(): Promise<AuthUser | null> {
     return null;
   }
 
+  // Fetch current permissions from database for real-time updates
+  const dbUser = await prisma.adminUser.findUnique({
+    where: { id: session.id },
+    select: { permissions: true, role: true },
+  });
+
+  // Use custom permissions from DB if set, otherwise use role defaults
+  const dbPermissions = dbUser?.permissions as string[] | null;
+  const permissions = dbPermissions && dbPermissions.length > 0
+    ? dbPermissions as PermissionKey[]
+    : getPermissionsForRole(dbUser?.role || session.role);
+
   return {
     id: session.id,
     email: session.email,
-    role: session.role,
+    role: dbUser?.role || session.role,
     tenantId: session.tenantId,
-    permissions: getPermissionsForRole(session.role),
+    permissions,
     locationIds: session.locationIds,
   };
 }
@@ -71,6 +85,14 @@ export async function requirePermission(permission: PermissionKey): Promise<Guar
   }
 
   const user = authResult.user!;
+
+  console.log('[RBAC] Checking permission:', {
+    permission,
+    userId: user.id,
+    role: user.role,
+    userPermissions: user.permissions,
+    hasPermission: can(user, permission),
+  });
 
   if (!can(user, permission)) {
     return {
@@ -192,28 +214,28 @@ export async function requireRoleAssignment(
  * Require menu read access
  */
 export async function requireMenuRead(): Promise<GuardResult> {
-  return requirePermission('menu.read');
+  return requirePermission('menus.read');
 }
 
 /**
  * Require menu write access
  */
 export async function requireMenuWrite(): Promise<GuardResult> {
-  return requirePermission('menu.update');
+  return requirePermission('menus.update');
 }
 
 /**
  * Require item read access
  */
 export async function requireItemRead(): Promise<GuardResult> {
-  return requirePermission('item.read');
+  return requirePermission('items.read');
 }
 
 /**
  * Require item write access
  */
 export async function requireItemWrite(): Promise<GuardResult> {
-  return requirePermission('item.update');
+  return requirePermission('items.update');
 }
 
 /**

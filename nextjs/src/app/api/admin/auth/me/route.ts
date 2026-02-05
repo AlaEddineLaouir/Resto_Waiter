@@ -21,6 +21,7 @@ export async function GET() {
         username: true,
         displayName: true,
         role: true,
+        permissions: true, // User's custom permissions
         tenantId: true,
         locationIds: true,
         tenant: {
@@ -40,36 +41,45 @@ export async function GET() {
       );
     }
 
-    // Get user's permissions based on their role
+    // Get user's effective permissions:
+    // 1. If user has custom permissions, use those
+    // 2. Otherwise, use role default permissions
     let permissions: string[] = [];
+    const customPermissions = admin.permissions as string[] | null;
     
-    try {
-      const systemRole = await prisma.systemRole.findUnique({
-        where: { slug: admin.role },
-        include: {
-          permissions: {
-            include: {
-              permission: {
-                select: { key: true },
+    if (customPermissions && customPermissions.length > 0) {
+      // User has custom permissions set
+      permissions = customPermissions;
+    } else {
+      // Fall back to role default permissions
+      try {
+        const systemRole = await prisma.systemRole.findUnique({
+          where: { slug: admin.role },
+          include: {
+            permissions: {
+              include: {
+                permission: {
+                  select: { key: true },
+                },
               },
             },
           },
-        },
-      });
+        });
 
-      if (systemRole) {
-        permissions = systemRole.permissions.map(rp => rp.permission.key);
+        if (systemRole) {
+          permissions = systemRole.permissions.map(rp => rp.permission.key);
+        }
+      } catch {
+        // SystemRole table might not exist yet, fallback to empty permissions
+        console.warn('Could not fetch system role permissions');
       }
-    } catch {
-      // SystemRole table might not exist yet, fallback to empty permissions
-      console.warn('Could not fetch system role permissions');
     }
 
     // Also return tenantSlug from session for frontend validation
     return NextResponse.json({ 
       admin: {
         ...admin,
-        permissions,
+        permissions, // Return effective permissions
       },
       tenantSlug: session.tenantSlug || admin.tenant.slug,
     });

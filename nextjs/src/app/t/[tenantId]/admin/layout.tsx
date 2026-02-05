@@ -198,20 +198,20 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     },
     {
       title: 'Organization',
-      permissions: ['brands.read', 'locations.read', 'ingredients.read'],
+      permissions: ['brands.read', 'locations.read'],
       items: [
         { name: 'Brands', href: `/t/${tenantId}/admin/brands`, icon: Icons.building, permission: 'brands.read' },
         { name: 'Locations', href: `/t/${tenantId}/admin/locations`, icon: Icons.location, permission: 'locations.read' },
-        { name: 'Ingredients', href: `/t/${tenantId}/admin/ingredients`, icon: Icons.beaker, permission: 'ingredients.read' },
       ],
     },
     {
       title: 'Menu Structure',
-      permissions: ['menus.read', 'sections.read', 'items.read'],
+      permissions: ['menus.read', 'sections.read', 'items.read', 'ingredients.read'],
       items: [
         { name: 'Menus', href: `/t/${tenantId}/admin/menus`, icon: Icons.clipboard, permission: 'menus.read' },
         { name: 'Sections', href: `/t/${tenantId}/admin/sections`, icon: Icons.bars, permission: 'sections.read' },
         { name: 'Items', href: `/t/${tenantId}/admin/items`, icon: Icons.book, permission: 'items.read' },
+        { name: 'Ingredients', href: `/t/${tenantId}/admin/ingredients`, icon: Icons.beaker, permission: 'ingredients.read' },
       ],
     },
     {

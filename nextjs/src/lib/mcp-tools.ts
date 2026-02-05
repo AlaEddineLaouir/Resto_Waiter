@@ -144,6 +144,8 @@ export async function executeGetMenu(
   tenantId: string,
   locale: string = 'en-US'
 ): Promise<ToolResult> {
+  console.log('[MCP] executeGetMenu called for tenant:', tenantId);
+  
   // Find published menus with their menu lines
   const menus = await prisma.menu.findMany({
     where: { 
@@ -171,6 +173,9 @@ export async function executeGetMenu(
               dietaryFlags: {
                 include: { dietaryFlag: { include: { translations: true } } },
               },
+              ingredients: {
+                include: { ingredient: true },
+              },
             },
           },
         },
@@ -178,18 +183,37 @@ export async function executeGetMenu(
     },
   });
 
+  console.log('[MCP] Found menus:', menus.length);
+  
   if (menus.length === 0) {
     return {
       content: [{ type: 'text', text: 'No published menus found for this restaurant.' }],
     };
   }
 
-  let menuText = '# Restaurant Menu\n\n';
+  // Log first few items and their ingredients for debugging
+  let totalItems = 0;
+  let itemsWithIngredients = 0;
+  for (const menu of menus) {
+    for (const line of menu.lines) {
+      if (line.item) {
+        totalItems++;
+        if (line.item.ingredients && line.item.ingredients.length > 0) {
+          itemsWithIngredients++;
+        }
+      }
+    }
+  }
+  console.log(`[MCP] Total items: ${totalItems}, Items with ingredients: ${itemsWithIngredients}`);
+
+  let menuText = '';
 
   for (const menu of menus) {
     const menuTrans = getTranslation(menu.translations, locale);
 
-    menuText += `## ${menuTrans?.name || menu.code}\n\n`;
+    menuText += `═══════════════════════════════════════\n`;
+    menuText += `📋 ${menuTrans?.name || menu.code}\n`;
+    menuText += `═══════════════════════════════════════\n\n`;
 
     // Get section lines (top-level lines with lineType='section')
     // Filter by: line is enabled, section exists, section is active
@@ -201,12 +225,6 @@ export async function executeGetMenu(
       const section = sectionLine.section!;
       const sectionTrans = getTranslation(section.translations, locale);
       
-      menuText += `### ${sectionTrans?.title || 'Section'}\n`;
-      if (sectionTrans?.description) {
-        menuText += `${sectionTrans.description}\n`;
-      }
-      menuText += '\n';
-
       // Get item lines that are children of this section line
       // Filter by: line is enabled, item exists, item is visible
       const itemLines = menu.lines.filter(
@@ -215,13 +233,17 @@ export async function executeGetMenu(
 
       // Skip sections with no visible items
       if (itemLines.length === 0) {
-        // Remove the section header we just added
-        const lastSectionIndex = menuText.lastIndexOf(`### ${sectionTrans?.title || 'Section'}`);
-        if (lastSectionIndex > 0) {
-          menuText = menuText.substring(0, lastSectionIndex);
-        }
         continue;
       }
+
+      // Section header with decorative line
+      menuText += `\n───────────────────────────────────────\n`;
+      menuText += `🍽️ ${sectionTrans?.title || 'Section'}\n`;
+      menuText += `───────────────────────────────────────\n`;
+      if (sectionTrans?.description) {
+        menuText += `${sectionTrans.description}\n`;
+      }
+      menuText += '\n';
 
       for (const itemLine of itemLines) {
         const item = itemLine.item!;
@@ -230,33 +252,51 @@ export async function executeGetMenu(
           ? `€${(Number(item.priceBase.amountMinor) / 100).toFixed(2)}`
           : '';
 
-        menuText += `**${itemTrans?.name || 'Item'}** ${price}\n`;
+        // Item name and price on one line
+        menuText += `• **${itemTrans?.name || 'Item'}** — ${price}\n`;
+        
+        // Description
         if (itemTrans?.description) {
-          menuText += `${itemTrans.description}\n`;
+          menuText += `  ${itemTrans.description}\n`;
         }
 
-        const tags: string[] = [];
-        for (const df of item.dietaryFlags) {
-          const dfTrans = getTranslation(df.dietaryFlag.translations, locale);
-          tags.push(`🏷️ ${dfTrans?.name || df.dietaryFlag.code}`);
+        // Ingredients section
+        if (item.ingredients && item.ingredients.length > 0) {
+          console.log(`[MCP] Item "${itemTrans?.name}" has ${item.ingredients.length} ingredients`);
+          const ingredientNames = item.ingredients.map((i: { ingredient: { name: string }, isOptional?: boolean }) => 
+            i.isOptional ? `${i.ingredient.name} (optional)` : i.ingredient.name
+          );
+          menuText += `  🥗 Ingredients: ${ingredientNames.join(', ')}\n`;
+        } else {
+          console.log(`[MCP] Item "${itemTrans?.name}" has NO ingredients`);
         }
+
+        // Dietary flags
+        if (item.dietaryFlags.length > 0) {
+          const flags = item.dietaryFlags.map(df => {
+            const dfTrans = getTranslation(df.dietaryFlag.translations, locale);
+            return dfTrans?.name || df.dietaryFlag.code;
+          });
+          menuText += `  🏷️ Dietary: ${flags.join(', ')}\n`;
+        }
+
+        // Allergens  
         if (item.allergens.length > 0) {
           const allergenNames = item.allergens.map((a) => {
             const aTrans = getTranslation(a.allergen.translations, locale);
             return aTrans?.name || a.allergen.code;
           });
-          tags.push(`⚠️ Allergens: ${allergenNames.join(', ')}`);
-        }
-        if (item.spicinessLevel && item.spicinessLevel > 0) {
-          tags.push(`🌶️ Spiciness: ${'🔥'.repeat(item.spicinessLevel)}`);
-        }
-        if (item.calories) {
-          tags.push(`📊 ${item.calories} cal`);
+          menuText += `  ⚠️ Allergens: ${allergenNames.join(', ')}\n`;
         }
 
-        if (tags.length > 0) {
-          menuText += `${tags.join(' | ')}\n`;
+        // Spiciness and calories
+        if (item.spicinessLevel && item.spicinessLevel > 0) {
+          menuText += `  🌶️ Spiciness: ${'🔥'.repeat(item.spicinessLevel)}\n`;
         }
+        if (item.calories) {
+          menuText += `  📊 Calories: ${item.calories} cal\n`;
+        }
+
         menuText += '\n';
       }
     }

@@ -16,7 +16,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const guard = await requirePermission('menu.read');
+    const guard = await requirePermission('menus.read');
     if (!guard.authorized) return guard.response;
     const session = guard.user!;
 
@@ -48,6 +48,7 @@ export async function GET(
                 priceBase: true,
                 allergens: { include: { allergen: { include: { translations: true } } } },
                 dietaryFlags: { include: { dietaryFlag: { include: { translations: true } } } },
+                ingredients: { include: { ingredient: true } },
               },
             },
             childLines: {
@@ -59,6 +60,7 @@ export async function GET(
                     priceBase: true,
                     allergens: { include: { allergen: { include: { translations: true } } } },
                     dietaryFlags: { include: { dietaryFlag: { include: { translations: true } } } },
+                    ingredients: { include: { ingredient: true } },
                   },
                 },
               },
@@ -86,7 +88,7 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const guard = await requirePermission('menu.update');
+    const guard = await requirePermission('menus.update');
     if (!guard.authorized) return guard.response;
     const session = guard.user!;
 
@@ -167,7 +169,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const guard = await requirePermission('menu.delete');
+    const guard = await requirePermission('menus.delete');
     if (!guard.authorized) return guard.response;
     const session = guard.user!;
 

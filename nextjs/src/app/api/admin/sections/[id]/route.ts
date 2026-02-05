@@ -7,7 +7,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const guard = await requirePermission('section.read');
+    const guard = await requirePermission('sections.read');
     if (!guard.authorized) return guard.response;
     const session = guard.user!;
 
@@ -44,7 +44,7 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const guard = await requirePermission('section.update');
+    const guard = await requirePermission('sections.update');
     if (!guard.authorized) return guard.response;
     const session = guard.user!;
 
@@ -137,7 +137,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const guard = await requirePermission('section.delete');
+    const guard = await requirePermission('sections.delete');
     if (!guard.authorized) return guard.response;
     const session = guard.user!;
 

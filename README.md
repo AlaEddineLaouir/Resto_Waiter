@@ -1,51 +1,48 @@
 # Restaurant Menu Chatbot 🍽️
 
-A multi-tenant SaaS restaurant menu chatbot using Model Context Protocol (MCP) with Perplexity AI integration, PostgreSQL database, and React.js frontend.
+A multi-tenant SaaS restaurant menu chatbot built with Next.js, PostgreSQL, Prisma ORM, and Perplexity AI integration.
 
 ## Features
 
 - **AI-Powered Chat**: Ask questions about the menu using natural language
 - **MCP Integration**: Structured tools for querying menu data
-- **React Frontend**: Modern React.js frontend with Vite
-- **Admin Dashboard**: Full CRUD for menu, ingredients, and settings
-- **Multi-Tenant**: Path-based tenant routing with isolated data
-- **PostgreSQL Database**: Persistent storage with migrations
-- **Search**: Find dishes by name or ingredient
+- **Next.js App Router**: Modern React framework with server components
+- **Admin Dashboard**: Full CRUD for menus, items, ingredients, and settings
+- **Platform Admin**: Super admin panel for managing all tenants
+- **Multi-Tenant**: Path-based tenant routing with isolated data (`/t/{tenantId}/...`)
+- **Multi-Location**: Support for brands and locations per tenant
+- **PostgreSQL + Prisma**: Type-safe database access with migrations
+- **RBAC**: Role-based access control with granular permissions
 
 ## Project Structure
 
 ```
-├── src/                      # Backend
-│   ├── server.js             # Main entry point with clustering
-│   ├── api/                  # Express.js REST API
-│   │   ├── app.js            # Main API routes
-│   │   ├── admin.js          # Admin API with JWT auth
-│   │   └── app-multitenant.js# Multi-tenant router
-│   ├── db/                   # Database layer
-│   │   ├── index.js          # PostgreSQL connection pool
-│   │   ├── migrate.js        # Migration runner
-│   │   ├── seed.js           # Seed script
-│   │   ├── migrations/       # SQL migrations
-│   │   └── repositories/     # Data access layer
-│   ├── mcp-server/           # MCP server with menu tools
-│   ├── mcp-client/           # MCP client for tool access
-│   └── middleware/           # Express middleware
-│       ├── auth.js           # JWT authentication
-│       ├── security.js       # Security headers
-│       ├── rateLimit.js      # Rate limiting
-│       └── tenant.js         # Tenant resolution
-├── frontend/                 # React.js frontend
+├── nextjs/                   # Next.js application
 │   ├── src/
+│   │   ├── app/              # App Router pages & API routes
+│   │   │   ├── api/          # REST API endpoints
+│   │   │   │   ├── admin/    # Restaurant admin APIs
+│   │   │   │   ├── platform/ # Platform admin APIs
+│   │   │   │   └── chat/     # Chat endpoint
+│   │   │   ├── t/[tenantId]/ # Tenant-scoped pages
+│   │   │   │   ├── admin/    # Restaurant admin dashboard
+│   │   │   │   ├── menu/     # Public menu view
+│   │   │   │   └── l/        # Location pages
+│   │   │   ├── platform/     # Platform admin pages
+│   │   │   └── chat/         # Chat interface
 │   │   ├── components/       # React components
-│   │   ├── contexts/         # Context providers
-│   │   ├── hooks/            # Custom hooks
-│   │   ├── services/         # API service layer
-│   │   └── App.jsx           # Main app with routing
-│   ├── package.json
-│   └── vite.config.js
-├── public/                   # Legacy vanilla JS frontend
-├── data/                     # JSON data (for non-DB mode)
-└── package.json
+│   │   └── lib/              # Utilities & helpers
+│   │       ├── prisma.ts     # Prisma client
+│   │       ├── auth.ts       # Authentication
+│   │       ├── mcp-tools.ts  # MCP tool definitions
+│   │       └── rbac/         # Role-based access control
+│   ├── prisma/
+│   │   ├── schema.prisma     # Database schema
+│   │   ├── migrations/       # Database migrations
+│   │   └── seed-*.ts         # Seed scripts
+│   └── package.json
+├── package.json              # Root wrapper scripts
+└── README.md
 ```
 
 ## Available MCP Tools
@@ -56,112 +53,93 @@ A multi-tenant SaaS restaurant menu chatbot using Model Context Protocol (MCP) w
 | `get_dish_details` | Get details about a specific dish |
 | `get_ingredients` | Get ingredients for a dish |
 | `search_dishes` | Search dishes by name or ingredient |
-| `get_vegetarian_dishes` | Get all vegetarian options |
-| `get_dishes_by_category` | Get dishes in a category |
 
 ## Setup
 
-### 1. Install Backend Dependencies
+### 1. Install Dependencies
 
 ```bash
 npm install
+npm run nextjs:install
 ```
 
-### 2. Install Frontend Dependencies
+### 2. Set Up PostgreSQL
 
-```bash
-npm run frontend:install
-# or: cd frontend && npm install
-```
-
-### 3. Set Up PostgreSQL (Optional)
-
-Create a `.env` file with:
+Create a `.env` file in the `nextjs/` folder:
 
 ```env
 DATABASE_URL=postgresql://user:password@localhost:5432/restaurant_menu
 JWT_SECRET=your-secret-key
-ENCRYPTION_KEY=your-32-char-encryption-key
+PERPLEXITY_API_KEY=your-perplexity-api-key
 ```
 
-Run migrations and seed:
+### 3. Run Migrations & Seed
 
 ```bash
-npm run db:migrate
-npm run db:seed
+cd nextjs
+npx prisma migrate dev
+npx prisma db seed
 ```
 
-### 4. Start Development Servers
+### 4. Start Development Server
 
 ```bash
-# Backend only (uses JSON data)
 npm run dev
-
-# Frontend only (proxies to backend)
-npm run frontend:dev
-
-# Both together
-npm run dev:full
 ```
 
-### 5. Configure Perplexity AI
+### 5. Access the Application
 
-- Open http://localhost:5173/settings (React) or http://localhost:3000/setup.html (legacy)
-- Enter your Perplexity AI API key
-- Get an API key from [Perplexity AI Settings](https://www.perplexity.ai/settings/api)
-
-### 6. Start Chatting
-
-- **React Frontend**: http://localhost:5173
-- **Legacy Frontend**: http://localhost:3000
-- **Admin Dashboard**: http://localhost:5173/admin
+- **Chat Interface**: http://localhost:3000/chat
+- **Platform Admin**: http://localhost:3000/platform
+- **Tenant Admin**: http://localhost:3000/t/{tenantSlug}/admin
+- **Public Menu**: http://localhost:3000/t/{tenantSlug}/menu
 
 ## API Endpoints
 
-### Public API
+### Chat API
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/api/config` | Get current configuration |
-| POST | `/api/config` | Save configuration |
-| GET | `/api/menu` | Get full menu |
-| GET | `/api/search?q=query` | Search dishes |
-| GET | `/api/tools` | List available MCP tools |
 | POST | `/api/chat` | Send a chat message |
 
 ### Admin API (JWT Required)
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/api/admin/login` | Admin login |
+| POST | `/api/admin/auth/login` | Admin login |
 | GET | `/api/admin/dashboard` | Dashboard stats |
-| CRUD | `/api/admin/categories` | Manage categories |
-| CRUD | `/api/admin/dishes` | Manage dishes |
+| CRUD | `/api/admin/menus` | Manage menus |
+| CRUD | `/api/admin/sections` | Manage menu sections |
+| CRUD | `/api/admin/items` | Manage menu items |
 | CRUD | `/api/admin/ingredients` | Manage ingredients |
-| GET/PUT | `/api/admin/settings` | Tenant settings |
+| CRUD | `/api/admin/users` | Manage admin users |
+| CRUD | `/api/admin/roles` | Manage roles |
 
-### Multi-Tenant Routing
+### Platform API (Super Admin)
 
-All routes support tenant prefix: `/t/{tenantId}/api/...`
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| CRUD | `/api/platform/restaurants` | Manage tenants |
+| CRUD | `/api/platform/users` | Manage platform users |
+| CRUD | `/api/platform/plans` | Manage subscription plans |
+| GET | `/api/platform/analytics` | Platform analytics |
 
 ## Scripts
 
 ```bash
 npm start              # Start production server
-npm run dev            # Start backend with hot reload
-npm run dev:full       # Start backend + frontend together
-npm run frontend:dev   # Start React development server
-npm run frontend:build # Build React for production
-npm run db:migrate     # Run database migrations
-npm run db:seed        # Seed database from menu.json
+npm run dev            # Start development server
+npm run build          # Build for production
+npm run lint           # Run ESLint
 ```
 
 ## Technologies
 
-- **Node.js** with ES Modules
-- **Express.js** for REST API
-- **React.js** with Vite for frontend
-- **PostgreSQL** with connection pooling
-- **@modelcontextprotocol/sdk** for MCP implementation
+- **Next.js 15** with App Router
+- **React 19** with Server Components
+- **TypeScript** for type safety
+- **PostgreSQL** with Prisma ORM
+- **Tailwind CSS** for styling
 - **Perplexity AI** for natural language processing
-- **JWT** for admin authentication
+- **JWT** for authentication
+- **RBAC** for authorization

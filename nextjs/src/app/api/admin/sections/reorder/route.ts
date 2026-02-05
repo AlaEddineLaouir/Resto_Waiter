@@ -9,7 +9,7 @@ import { requirePermission } from '@/lib/rbac';
  */
 export async function PATCH(req: Request) {
   try {
-    const guard = await requirePermission('section.update');
+    const guard = await requirePermission('sections.update');
     if (!guard.authorized) return guard.response;
     const session = guard.user!;
 

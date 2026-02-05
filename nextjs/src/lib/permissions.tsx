@@ -95,27 +95,19 @@ export function PermissionProvider({ children, tenantId }: PermissionProviderPro
         return;
       }
 
-      // Fetch roles to get user's permissions
+      // Fetch roles for role level info
       const rolesRes = await fetch('/api/admin/roles');
       if (rolesRes.ok) {
         const rolesData = await rolesRes.json();
         setRoles(rolesData.roles || []);
-        
-        // Find user's role and get permissions
-        const userRole = rolesData.roles.find((r: SystemRole) => r.slug === currentUser.role);
-        const rolePermissions = userRole?.permissionKeys || [];
-        
-        // Merge with user's custom permissions if any
-        const userPermissions = currentUser.permissions || [];
-        const mergedPermissions = [...new Set([...rolePermissions, ...userPermissions])];
-        
-        setUser(currentUser);
-        setPermissions(mergedPermissions);
-      } else {
-        // Fallback: use static permissions based on role
-        setUser(currentUser);
-        setPermissions(currentUser.permissions || []);
       }
+      
+      // Use the permissions returned from /me endpoint
+      // These are already the effective permissions (custom or role defaults)
+      const effectivePermissions = currentUser.permissions || [];
+      
+      setUser(currentUser);
+      setPermissions(effectivePermissions);
     } catch (err) {
       console.error('Failed to fetch permissions:', err);
       setError('Failed to load permissions');
@@ -127,6 +119,25 @@ export function PermissionProvider({ children, tenantId }: PermissionProviderPro
   useEffect(() => {
     fetchUserAndPermissions();
   }, [fetchUserAndPermissions, tenantId]);
+
+  // Refresh permissions when window gets focus (in case admin changed them)
+  useEffect(() => {
+    const handleFocus = () => {
+      fetchUserAndPermissions();
+    };
+    
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [fetchUserAndPermissions]);
+
+  // Also refresh every 30 seconds for real-time updates
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchUserAndPermissions();
+    }, 30000);
+    
+    return () => clearInterval(interval);
+  }, [fetchUserAndPermissions]);
 
   // Permission check functions
   const hasPermission = useCallback((permission: string): boolean => {

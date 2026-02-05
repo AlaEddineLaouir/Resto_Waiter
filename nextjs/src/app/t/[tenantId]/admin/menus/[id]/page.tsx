@@ -38,6 +38,13 @@ interface DietaryFlag {
   dietaryFlag: { code: string; translations: { locale: string; name: string }[] };
 }
 
+interface Ingredient {
+  ingredient: { id: string; name: string; isAllergen?: boolean };
+  quantity?: string | null;
+  unit?: string | null;
+  isOptional?: boolean;
+}
+
 interface PriceBase {
   currency: string;
   amountMinor: number;
@@ -60,6 +67,7 @@ interface Item {
   priceBase: PriceBase | null;
   allergens: Allergen[];
   dietaryFlags: DietaryFlag[];
+  ingredients: Ingredient[];
 }
 
 interface MenuLine {
@@ -272,6 +280,13 @@ function SortableLine({
           </div>
           {!isSection && line.item?.sku && (
             <span className="text-xs text-gray-400 font-mono">{line.item.sku}</span>
+          )}
+          {/* Show ingredients for items */}
+          {!isSection && line.item?.ingredients && line.item.ingredients.length > 0 && (
+            <div className="text-xs text-gray-500 mt-1">
+              <span className="font-medium">🥗 </span>
+              {line.item.ingredients.map(i => i.ingredient.name).join(', ')}
+            </div>
           )}
         </div>
 

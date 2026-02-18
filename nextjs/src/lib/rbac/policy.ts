@@ -152,7 +152,7 @@ export function canDeleteUser(
 }
 
 /**
- * Prevent self-demotion for owners
+ * Prevent self-demotion for admins
  */
 export function canModifySelf(
   user: AuthUser,
@@ -160,11 +160,11 @@ export function canModifySelf(
 ): AuthResult {
   // If role is changing
   if (newRole && newRole !== user.role) {
-    // Owners cannot demote themselves
-    if (user.role === 'owner' && newRole !== 'owner') {
+    // Admins cannot demote themselves
+    if (user.role === 'admin' && newRole !== 'admin') {
       return {
         allowed: false,
-        reason: 'Owners cannot demote themselves',
+        reason: 'Admins cannot demote themselves',
       };
     }
   }
@@ -181,7 +181,7 @@ export function canModifySelf(
  * Some roles may be scoped to specific locations.
  */
 export function canAccessLocation(user: AuthUser, locationId: string): boolean {
-  // Owners and managers have access to all locations
+  // Admins and managers have access to all locations
   if (getRoleLevel(user.role) >= getRoleLevel('manager')) {
     return true;
   }

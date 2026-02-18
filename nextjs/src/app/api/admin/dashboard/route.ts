@@ -14,6 +14,7 @@ export async function GET() {
     const thirtyDaysAgo = new Date(today);
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
+    // --- Common queries for all roles ---
     const [
       tenant,
       totalBrands,
@@ -71,7 +72,69 @@ export async function GET() {
       }),
     ]);
 
+    // --- Role-specific data ---
+    const role = session.role;
+    let roleData: Record<string, unknown> = {};
+
+    if (role === 'admin' || role === 'manager') {
+      // Staff counts by role for admin/manager dashboards
+      const staffByRole = await prisma.adminUser.groupBy({
+        by: ['role'],
+        where: { tenantId: session.tenantId, isActive: true },
+        _count: { id: true },
+      });
+
+      const totalSections = await prisma.section.count({
+        where: { tenantId: session.tenantId },
+      });
+
+      const publishedMenus = await prisma.menu.count({
+        where: { tenantId: session.tenantId, status: 'published' },
+      });
+
+      roleData = {
+        staffByRole: staffByRole.map((s) => ({
+          role: s.role,
+          count: s._count.id,
+        })),
+        totalStaff: staffByRole.reduce((sum, s) => sum + s._count.id, 0),
+        totalSections,
+        publishedMenus,
+        draftMenus: totalMenus - publishedMenus,
+      };
+    }
+
+    if (role === 'chef') {
+      // Chef gets item counts and ingredient/allergen info
+      const totalSections = await prisma.section.count({
+        where: { tenantId: session.tenantId },
+      });
+
+      roleData = {
+        totalSections,
+        // Placeholder order queue stats (expand when orders are implemented)
+        orderQueue: { pending: 0, inProgress: 0, ready: 0 },
+        completedToday: 0,
+      };
+    }
+
+    if (role === 'waiter') {
+      // Waiter gets menu overview for customer questions
+      const totalSections = await prisma.section.count({
+        where: { tenantId: session.tenantId },
+      });
+
+      roleData = {
+        totalSections,
+        // Placeholder order stats (expand when orders are implemented)
+        myActiveOrders: 0,
+        todayOrdersServed: 0,
+        todayCovers: 0,
+      };
+    }
+
     return NextResponse.json({
+      role,
       restaurant: {
         name: tenant?.name,
         slug: tenant?.slug,
@@ -97,6 +160,7 @@ export async function GET() {
         monthlyMenuViews: monthlyUsage._sum.menuViews || 0,
         monthlyUniqueUsers: monthlyUsage._sum.uniqueUsers || 0,
       },
+      ...roleData,
       recentSessions: recentSessions.map((s) => ({
         id: s.id,
         createdAt: s.createdAt,

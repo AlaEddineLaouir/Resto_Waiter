@@ -67,7 +67,7 @@ async function main() {
       username: 'admin',
       email: 'admin@demo-restaurant.com',
       passwordHash: hashedPassword,
-      role: 'owner',
+      role: 'admin',
       isActive: true,
     }
   });

@@ -78,7 +78,7 @@ const ENTITY_PERMISSIONS: EntityPermissionConfig[] = [
     ],
   },
   {
-    entity: 'option-groups',
+    entity: 'options',
     label: 'Option Groups',
     category: 'Menu Management',
     operations: [
@@ -115,7 +115,7 @@ const ENTITY_PERMISSIONS: EntityPermissionConfig[] = [
   
   // Staff & Users
   {
-    entity: 'users',
+    entity: 'staff',
     label: 'Staff/Users',
     category: 'Staff Management',
     operations: [
@@ -170,13 +170,106 @@ const ENTITY_PERMISSIONS: EntityPermissionConfig[] = [
       { key: 'read', label: 'View Dashboard', description: 'Can access the admin dashboard' },
     ],
   },
+
+  // Floor Plan & Tables
+  {
+    entity: 'floor-layouts',
+    label: 'Floor Layouts',
+    category: 'Floor Plan',
+    operations: [
+      { key: 'read', label: 'View Floor Layouts', description: 'Can view restaurant floor plans' },
+      { key: 'create', label: 'Create Floor Layouts', description: 'Can create new floor plans' },
+      { key: 'update', label: 'Edit Floor Layouts', description: 'Can modify floor plan designs' },
+      { key: 'delete', label: 'Delete Floor Layouts', description: 'Can remove floor plans' },
+      { key: 'publish', label: 'Publish Floor Layouts', description: 'Can publish floor plans to make them live' },
+    ],
+  },
+  {
+    entity: 'floor-tables',
+    label: 'Floor Tables',
+    category: 'Floor Plan',
+    operations: [
+      { key: 'read', label: 'View Tables', description: 'Can view table placements and details' },
+      { key: 'create', label: 'Create Tables', description: 'Can add tables to floor plans' },
+      { key: 'update', label: 'Edit Tables', description: 'Can modify table positions, capacity, and properties' },
+      { key: 'delete', label: 'Delete Tables', description: 'Can remove tables from floor plans' },
+      { key: 'merge', label: 'Merge/Split Tables', description: 'Can merge and split tables for large parties' },
+    ],
+  },
+
+  // Reference Data
+  {
+    entity: 'allergens',
+    label: 'Allergens',
+    category: 'Reference Data',
+    operations: [
+      { key: 'read', label: 'View Allergens', description: 'Can view allergen information' },
+    ],
+  },
+  {
+    entity: 'dietary',
+    label: 'Dietary Flags',
+    category: 'Reference Data',
+    operations: [
+      { key: 'read', label: 'View Dietary Flags', description: 'Can view dietary flag information' },
+    ],
+  },
+
+  // Chatbot
+  {
+    entity: 'chatbot',
+    label: 'Admin Chatbot',
+    category: 'Tools',
+    operations: [
+      { key: 'read', label: 'Use Chatbot', description: 'Can use the admin AI chatbot assistant' },
+    ],
+  },
+
+  // Orders & Service
+  {
+    entity: 'orders',
+    label: 'Orders',
+    category: 'Orders & Service',
+    operations: [
+      { key: 'read', label: 'View Orders', description: 'Can view customer orders' },
+      { key: 'create', label: 'Create Orders', description: 'Can create orders on behalf of customers' },
+      { key: 'update', label: 'Update Orders', description: 'Can update order status (confirm, prepare, serve)' },
+      { key: 'delete', label: 'Cancel Orders', description: 'Can cancel or void orders' },
+    ],
+  },
+  {
+    entity: 'payments',
+    label: 'Payments',
+    category: 'Orders & Service',
+    operations: [
+      { key: 'read', label: 'View Payments', description: 'Can view payment records' },
+      { key: 'create', label: 'Process Payments', description: 'Can process customer payments' },
+    ],
+  },
+  {
+    entity: 'feedback',
+    label: 'Feedback',
+    category: 'Orders & Service',
+    operations: [
+      { key: 'read', label: 'View Feedback', description: 'Can view customer feedback and ratings' },
+    ],
+  },
+  {
+    entity: 'sessions',
+    label: 'Table Sessions',
+    category: 'Orders & Service',
+    operations: [
+      { key: 'read', label: 'View Sessions', description: 'Can view active table sessions' },
+      { key: 'close', label: 'Close Sessions', description: 'Can close table sessions after payment' },
+    ],
+  },
 ];
 
 // Default role configurations
 const DEFAULT_ROLES = [
   {
-    slug: 'owner',
-    name: 'Owner',
+    slug: 'admin',
+    name: 'Admin',
     description: 'Full access to all restaurant features',
     icon: '👑',
     color: 'bg-purple-100 text-purple-800 border-purple-300',
@@ -187,66 +280,45 @@ const DEFAULT_ROLES = [
   {
     slug: 'manager',
     name: 'Manager',
-    description: 'Manage operations, staff, and menus',
+    description: 'Daily operations - menus, staff, analytics, orders',
     icon: '📊',
     color: 'bg-blue-100 text-blue-800 border-blue-300',
     level: 80,
-    isDefault: false,
+    isDefault: true,
     permissionFilter: (key: string) => {
-      // Managers can do everything except delete brands/locations, manage settings
-      const excluded = ['brands.delete', 'settings.update'];
+      // Managers can do everything except delete brands/locations/staff, manage settings
+      const excluded = ['brands.create', 'brands.delete', 'locations.create', 'locations.delete', 'publications.delete', 'staff.delete', 'orders.delete', 'settings.update', 'floor-layouts.create', 'floor-layouts.update', 'floor-layouts.delete', 'floor-layouts.publish', 'floor-tables.create', 'floor-tables.update', 'floor-tables.delete', 'floor-tables.merge', 'chatbot.read'];
       return !excluded.includes(key);
     },
   },
   {
-    slug: 'menu_editor',
-    name: 'Menu Editor',
-    description: 'Create and edit menu content',
-    icon: '✏️',
-    color: 'bg-green-100 text-green-800 border-green-300',
-    level: 50,
-    isDefault: true,
-    permissionFilter: (key: string) => {
-      // Menu editors can only work with menu-related entities
-      const allowed = [
-        'dashboard.read',
-        'menus.read', 'menus.create', 'menus.update',
-        'sections.read', 'sections.create', 'sections.update',
-        'items.read', 'items.create', 'items.update',
-        'ingredients.read', 'ingredients.create', 'ingredients.update',
-        'option-groups.read', 'option-groups.create', 'option-groups.update',
-        'brands.read',
-        'locations.read',
-        'analytics.read',
-      ];
-      return allowed.includes(key);
-    },
-  },
-  {
-    slug: 'foh_staff',
-    name: 'Front of House',
-    description: 'View menus and manage orders',
-    icon: '🍽️',
-    color: 'bg-yellow-100 text-yellow-800 border-yellow-300',
+    slug: 'chef',
+    name: 'Chef',
+    description: 'Kitchen focused - view items, ingredients, manage orders',
+    icon: '👨‍🍳',
+    color: 'bg-orange-100 text-orange-800 border-orange-300',
     level: 30,
     isDefault: false,
     permissionFilter: (key: string) => {
       const allowed = [
         'dashboard.read',
-        'menus.read',
-        'sections.read',
         'items.read',
-        'locations.read',
+        'sections.read',
+        'ingredients.read',
+        'orders.read', 'orders.update',
+        'sessions.read',
+        'allergens.read', 'dietary.read',
+        'chatbot.read',
       ];
       return allowed.includes(key);
     },
   },
   {
-    slug: 'kitchen_staff',
-    name: 'Kitchen Staff',
-    description: 'View menu items and ingredients',
-    icon: '👨‍🍳',
-    color: 'bg-orange-100 text-orange-800 border-orange-300',
+    slug: 'waiter',
+    name: 'Waiter',
+    description: 'Front of house - view menu, manage orders',
+    icon: '🍽️',
+    color: 'bg-yellow-100 text-yellow-800 border-yellow-300',
     level: 20,
     isDefault: false,
     permissionFilter: (key: string) => {
@@ -255,7 +327,13 @@ const DEFAULT_ROLES = [
         'menus.read',
         'sections.read',
         'items.read',
-        'ingredients.read',
+        'locations.read',
+        'orders.read', 'orders.create', 'orders.update',
+        'sessions.read', 'sessions.close',
+        'payments.read',
+        'allergens.read', 'dietary.read',
+        'floor-layouts.read', 'floor-tables.read',
+        'chatbot.read',
       ];
       return allowed.includes(key);
     },
@@ -413,6 +491,48 @@ async function syncPermissions() {
 
     console.log(`  ✓ ${roleData.name}: ${rolePermissionKeys.length} permissions`);
   }
+
+  // Deactivate old roles that are no longer in DEFAULT_ROLES
+  const validSlugs = DEFAULT_ROLES.map(r => r.slug);
+  const deactivated = await prisma.systemRole.updateMany({
+    where: {
+      slug: { notIn: validSlugs },
+      isActive: true,
+    },
+    data: { isActive: false },
+  });
+  if (deactivated.count > 0) {
+    console.log(`\n🗑️  Deactivated ${deactivated.count} old role(s) not in current config`);
+  }
+
+  // ── Refresh AdminUser.permissions arrays ───────────────
+  // Users have a permissions JSON array on their record.
+  // When new permissions are added, we must update those arrays
+  // so the runtime guard picks up the new permissions.
+  console.log('\n🔄 Refreshing AdminUser permission arrays...');
+
+  const allUsers = await prisma.adminUser.findMany({
+    select: { id: true, role: true },
+  });
+
+  let usersUpdated = 0;
+  for (const user of allUsers) {
+    // Find the matching role definition
+    const roleDef = DEFAULT_ROLES.find(r => r.slug === user.role);
+    if (!roleDef) continue;
+
+    // Build the permission key list for this role
+    const userPermKeys = allPermissions
+      .map(p => p.key)
+      .filter(roleDef.permissionFilter);
+
+    await prisma.adminUser.update({
+      where: { id: user.id },
+      data: { permissions: userPermKeys },
+    });
+    usersUpdated++;
+  }
+  console.log(`   Updated ${usersUpdated} user(s) permission arrays`);
 
   console.log('\n✅ Sync complete!\n');
 }

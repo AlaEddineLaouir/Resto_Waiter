@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter, useParams, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { PermissionProvider } from '@/lib/permissions';
+import AdminChatbot from '@/components/AdminChatbot';
 
 interface AdminUser {
   id: string;
@@ -182,10 +183,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   // Get user permissions from admin data
   const userPermissions = admin?.permissions || [];
   
-  // Helper to check if user has permission (owner has all permissions)
+  // Helper to check if user has permission (admin has all permissions)
   const hasPermission = (permission: string): boolean => {
     if (!admin) return false;
-    if (admin.role === 'owner') return true;
+    if (admin.role === 'admin') return true;
     return userPermissions.includes(permission);
   };
 
@@ -216,18 +217,34 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     },
     {
       title: 'Customizations',
-      permissions: ['option-groups.read'],
+      permissions: ['options.read'],
       items: [
-        { name: 'Option Groups', href: `/t/${tenantId}/admin/option-groups`, icon: Icons.adjustments, permission: 'option-groups.read' },
+        { name: 'Option Groups', href: `/t/${tenantId}/admin/option-groups`, icon: Icons.adjustments, permission: 'options.read' },
+      ],
+    },
+    {
+      title: 'Floor Plan',
+      permissions: ['floor-layouts.read', 'floor-tables.read'],
+      items: [
+        { name: 'Layouts', href: `/t/${tenantId}/admin/floor-plans`, icon: Icons.clipboard, permission: 'floor-layouts.read' },
+        { name: 'Tables', href: `/t/${tenantId}/admin/floor-plans/tables`, icon: Icons.bars, permission: 'floor-tables.read' },
+      ],
+    },
+    {
+      title: 'Orders & Service',
+      permissions: ['orders.read'],
+      items: [
+        { name: 'Orders', href: `/t/${tenantId}/admin/orders`, icon: Icons.clipboard, permission: 'orders.read' },
+        { name: 'Kitchen Display', href: `/t/${tenantId}/admin/kitchen`, icon: Icons.clock, permission: 'orders.read', roles: ['admin', 'manager', 'chef'] },
       ],
     },
     {
       title: 'Team',
-      permissions: ['users.read'],
+      permissions: ['staff.read'],
       items: [
-        { name: 'Users & Staff', href: `/t/${tenantId}/admin/users`, icon: Icons.users, permission: 'users.read' },
+        { name: 'Users & Staff', href: `/t/${tenantId}/admin/users`, icon: Icons.users, permission: 'staff.read' },
       ],
-      roles: ['owner', 'manager'], // Only visible to owners and managers
+      roles: ['admin', 'manager'], // Only visible to admins and managers
     },
   ];
 
@@ -409,6 +426,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           {children}
         </main>
       </div>
+      
+      {/* Admin Chatbot */}
+      <AdminChatbot tenantId={tenantId as string} userPermissions={admin?.permissions || []} />
     </div>
     </PermissionProvider>
   );

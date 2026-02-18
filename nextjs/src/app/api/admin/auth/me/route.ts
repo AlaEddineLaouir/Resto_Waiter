@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getRestaurantSession } from '@/lib/restaurant-auth';
 import { prisma } from '@/lib/prisma';
+import { getPermissionsForRole } from '@/lib/rbac/roles';
 
 export async function GET() {
   try {
@@ -43,35 +44,42 @@ export async function GET() {
 
     // Get user's effective permissions:
     // 1. If user has custom permissions, use those
-    // 2. Otherwise, use role default permissions
+    // 2. Otherwise, use hardcoded role defaults (same as server-side guards)
+    // 3. As last resort, query SystemRole DB table
     let permissions: string[] = [];
     const customPermissions = admin.permissions as string[] | null;
     
     if (customPermissions && customPermissions.length > 0) {
-      // User has custom permissions set
+      // User has custom permissions set in DB
       permissions = customPermissions;
     } else {
-      // Fall back to role default permissions
-      try {
-        const systemRole = await prisma.systemRole.findUnique({
-          where: { slug: admin.role },
-          include: {
-            permissions: {
-              include: {
-                permission: {
-                  select: { key: true },
+      // Fall back to hardcoded role permissions (source of truth)
+      const roleDefaults = getPermissionsForRole(admin.role);
+      if (roleDefaults.length > 0) {
+        permissions = roleDefaults;
+      } else {
+        // Last resort: query SystemRole table
+        try {
+          const systemRole = await prisma.systemRole.findUnique({
+            where: { slug: admin.role },
+            include: {
+              permissions: {
+                include: {
+                  permission: {
+                    select: { key: true },
+                  },
                 },
               },
             },
-          },
-        });
+          });
 
-        if (systemRole) {
-          permissions = systemRole.permissions.map(rp => rp.permission.key);
+          if (systemRole) {
+            permissions = systemRole.permissions.map(rp => rp.permission.key);
+          }
+        } catch {
+          // SystemRole table might not exist yet
+          console.warn('Could not fetch system role permissions');
         }
-      } catch {
-        // SystemRole table might not exist yet, fallback to empty permissions
-        console.warn('Could not fetch system role permissions');
       }
     }
 

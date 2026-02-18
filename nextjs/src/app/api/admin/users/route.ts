@@ -87,8 +87,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate role
-    const validRoles: TenantUserRole[] = ['owner', 'manager', 'menu_editor', 'foh_staff', 'kitchen_staff'];
-    const targetRole = (role || 'menu_editor') as TenantUserRole;
+    const validRoles: TenantUserRole[] = ['admin', 'manager', 'chef', 'waiter'];
+    const targetRole = (role || 'manager') as TenantUserRole;
     
     if (!validRoles.includes(targetRole)) {
       return NextResponse.json({ error: 'Invalid role' }, { status: 400 });
@@ -99,9 +99,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Cannot assign a role equal or higher than your own' }, { status: 403 });
     }
 
-    // Only owner can create other owners
-    if (targetRole === 'owner' && session.role !== 'owner') {
-      return NextResponse.json({ error: 'Only owners can create owner accounts' }, { status: 403 });
+    // Only admin can create other admins
+    if (targetRole === 'admin' && session.role !== 'admin') {
+      return NextResponse.json({ error: 'Only admins can create admin accounts' }, { status: 403 });
     }
 
     // Check if email already exists for this tenant

@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import ChatInterface from '@/components/ChatInterface';
 import Link from 'next/link';
+import { GuestPageWrapper } from '../../guest-wrapper';
 
 interface LocationPageProps {
   params: Promise<{
@@ -59,7 +60,12 @@ export default async function LocationChatPage({ params }: LocationPageProps) {
   const displayName = `${tenant.name} - ${location.name}`;
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <GuestPageWrapper
+      tenantSlug={tenant.slug}
+      restaurantName={tenant.name}
+      currentPage="chat"
+      locationSlug={location.slug}
+    >
       {/* Location Header */}
       <div className="bg-gradient-to-r from-amber-600 to-orange-600 text-white px-4 py-2">
         <div className="max-w-4xl mx-auto flex items-center justify-between text-sm">
@@ -94,7 +100,7 @@ export default async function LocationChatPage({ params }: LocationPageProps) {
           restaurantName={displayName}
         />
       </div>
-    </div>
+    </GuestPageWrapper>
   );
 }
 

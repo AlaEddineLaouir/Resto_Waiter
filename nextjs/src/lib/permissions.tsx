@@ -52,7 +52,7 @@ interface PermissionContextType {
   
   // Role checks
   getRoleLevel: () => number;
-  isOwner: () => boolean;
+  isAdmin: () => boolean;
   isManager: () => boolean;
   
   // Refresh
@@ -142,20 +142,20 @@ export function PermissionProvider({ children, tenantId }: PermissionProviderPro
   // Permission check functions
   const hasPermission = useCallback((permission: string): boolean => {
     if (!user) return false;
-    // Owners have all permissions
-    if (user.role === 'owner') return true;
+    // Admins have all permissions
+    if (user.role === 'admin') return true;
     return permissions.includes(permission);
   }, [user, permissions]);
 
   const hasAnyPermission = useCallback((perms: string[]): boolean => {
     if (!user) return false;
-    if (user.role === 'owner') return true;
+    if (user.role === 'admin') return true;
     return perms.some(p => permissions.includes(p));
   }, [user, permissions]);
 
   const hasAllPermissions = useCallback((perms: string[]): boolean => {
     if (!user) return false;
-    if (user.role === 'owner') return true;
+    if (user.role === 'admin') return true;
     return perms.every(p => permissions.includes(p));
   }, [user, permissions]);
 
@@ -183,12 +183,12 @@ export function PermissionProvider({ children, tenantId }: PermissionProviderPro
     return role?.level || 0;
   }, [user, roles]);
 
-  const isOwner = useCallback((): boolean => {
-    return user?.role === 'owner';
+  const isAdmin = useCallback((): boolean => {
+    return user?.role === 'admin';
   }, [user]);
 
   const isManager = useCallback((): boolean => {
-    return user?.role === 'owner' || user?.role === 'manager';
+    return user?.role === 'admin' || user?.role === 'manager';
   }, [user]);
 
   const value: PermissionContextType = {
@@ -205,7 +205,7 @@ export function PermissionProvider({ children, tenantId }: PermissionProviderPro
     canUpdate,
     canDelete,
     getRoleLevel,
-    isOwner,
+    isAdmin,
     isManager,
     refreshPermissions: fetchUserAndPermissions,
   };

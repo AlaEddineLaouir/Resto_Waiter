@@ -37,28 +37,28 @@ const USERS_TO_CREATE: UserSeed[] = [
     email: 'fatima@dar-el-baraka.com',
     password: 'Kitchen123!',
     displayName: 'Fatima Cherif',
-    role: 'menu_editor',
+    role: 'chef',
   },
   {
     username: 'server_youssef',
     email: 'youssef@dar-el-baraka.com',
     password: 'FrontOfHouse123!',
     displayName: 'Youssef Hadj',
-    role: 'foh_staff',
+    role: 'waiter',
   },
   {
     username: 'cook_aicha',
     email: 'aicha@dar-el-baraka.com',
     password: 'Kitchen456!',
     displayName: 'Aicha Boudiaf',
-    role: 'kitchen_staff',
+    role: 'chef',
   },
   {
-    username: 'editor_mehdi',
+    username: 'waiter_mehdi',
     email: 'mehdi@dar-el-baraka.com',
-    password: 'Editor789!',
+    password: 'Waiter789!',
     displayName: 'Mehdi Amrani',
-    role: 'menu_editor',
+    role: 'waiter',
   },
 ];
 
@@ -105,7 +105,7 @@ async function main() {
 
     // Assign location restrictions for lower-level staff
     let locationIds: string[] = [];
-    if (['foh_staff', 'kitchen_staff'].includes(userData.role) && locations.length > 0) {
+    if (['waiter', 'chef'].includes(userData.role) && locations.length > 0) {
       // Assign to first location only for testing location-based access
       locationIds = [locations[0].id];
     }
@@ -139,8 +139,8 @@ async function main() {
 
   console.log('Login URL: http://localhost:3001/t/dar-el-baraka/admin/login\n');
 
-  // Print existing owner
-  console.log('👑 OWNER:');
+  // Print existing admin
+  console.log('👑 ADMIN:');
   console.log('   Email: admin@dar-el-baraka.com');
   console.log('   Password: baraka123');
   console.log('');
@@ -154,9 +154,8 @@ async function main() {
 
   const roleLabels: Record<string, string> = {
     manager: '📊 MANAGER',
-    menu_editor: '✏️ MENU EDITOR',
-    foh_staff: '🍽️ FRONT OF HOUSE',
-    kitchen_staff: '👨‍🍳 KITCHEN STAFF',
+    chef: '👨‍🍳 CHEF',
+    waiter: '🍽️ WAITER',
   };
 
   for (const [role, users] of Object.entries(byRole)) {

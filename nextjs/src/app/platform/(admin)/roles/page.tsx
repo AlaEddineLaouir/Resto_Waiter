@@ -469,7 +469,7 @@ export default function RolesPage() {
                     value={roleForm.slug}
                     onChange={(e) => setRoleForm({ ...roleForm, slug: e.target.value })}
                     className="w-full px-4 py-2 border rounded-lg"
-                    placeholder="e.g., menu_editor"
+                    placeholder="e.g., chef"
                     required
                   />
                 </div>

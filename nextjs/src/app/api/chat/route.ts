@@ -88,9 +88,9 @@ async function trackChatSession(tenantId: string, sessionId: string | undefined)
 
 export async function POST(req: Request) {
   try {
-    const { messages, tenantId, sessionId } = await req.json();
+    const { messages, tenantId: rawTenantId, sessionId } = await req.json();
 
-    if (!tenantId) {
+    if (!rawTenantId) {
       return new Response(JSON.stringify({ error: 'Tenant ID required' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' },
@@ -104,8 +104,36 @@ export async function POST(req: Request) {
       });
     }
 
-    // Track chat session and update analytics
-    const currentSessionId = await trackChatSession(tenantId, sessionId);
+    // Resolve tenant ID - if "default", find a demo restaurant
+    let tenantId = rawTenantId;
+    if (rawTenantId === 'default') {
+      const demoTenant = await prisma.tenant.findFirst({
+        where: {
+          OR: [
+            { slug: 'demo-restaurant' },
+            { slug: 'baraka' },
+            { isActive: true }
+          ]
+        },
+        orderBy: { createdAt: 'asc' }
+      });
+      
+      if (!demoTenant) {
+        return new Response(JSON.stringify({ 
+          error: 'No restaurant configured. Please run database seeds first.' 
+        }), {
+          status: 404,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      tenantId = demoTenant.id;
+      console.log('[Chat] Resolved default tenant to:', demoTenant.slug, tenantId);
+    }
+
+    // Track chat session and update analytics (skip for demo/default mode)
+    const currentSessionId = rawTenantId !== 'default' 
+      ? await trackChatSession(tenantId, sessionId) 
+      : sessionId;
 
     // Get menu context for the AI
     const menuContext = await executeGetMenu(tenantId);

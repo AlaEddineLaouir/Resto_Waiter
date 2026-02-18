@@ -68,7 +68,7 @@ async function main() {
       username: 'admin',
       email: 'admin@dar-el-baraka.com',
       passwordHash: hashedPassword,
-      role: 'owner',
+      role: 'admin',
       isActive: true,
     }
   });

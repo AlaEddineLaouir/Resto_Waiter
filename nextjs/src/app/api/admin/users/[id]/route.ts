@@ -104,8 +104,8 @@ export async function PUT(
     }
 
     // Prevent self-demotion
-    if (session.id === id && existingUser.role === 'owner' && role && role !== 'owner') {
-      return NextResponse.json({ error: 'Cannot demote yourself from owner' }, { status: 400 });
+    if (session.id === id && existingUser.role === 'admin' && role && role !== 'admin') {
+      return NextResponse.json({ error: 'Cannot demote yourself from admin' }, { status: 400 });
     }
 
     const updateData: Record<string, unknown> = {};

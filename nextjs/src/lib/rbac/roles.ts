@@ -1,6 +1,7 @@
 /**
  * Role Definitions with Permission Mappings
  * 
+ * 4-Role MVP: Admin, Manager, Chef, Waiter
  * Each role has a set of permissions it grants.
  * This is the central source of truth for what each role can do.
  */
@@ -28,21 +29,36 @@ import {
   OPTION_READ, OPTION_CREATE, OPTION_UPDATE, OPTION_DELETE,
   // Staff
   STAFF_READ, STAFF_CREATE, STAFF_UPDATE, STAFF_DELETE,
+  // Orders
+  ORDER_READ, ORDER_CREATE, ORDER_UPDATE, ORDER_DELETE,
   // Analytics
-  ANALYTICS_VIEW,
+  ANALYTICS_VIEW, ANALYTICS_EXPORT,
+  // Settings
+  SETTINGS_READ, SETTINGS_UPDATE,
   // Reference data
   ALLERGEN_READ, DIETARY_READ,
+  // Chatbot
+  CHATBOT_READ,
+  // Floor Plan
+  FLOOR_LAYOUT_READ, FLOOR_LAYOUT_CREATE, FLOOR_LAYOUT_UPDATE, FLOOR_LAYOUT_DELETE, FLOOR_LAYOUT_PUBLISH,
+  FLOOR_TABLE_READ, FLOOR_TABLE_CREATE, FLOOR_TABLE_UPDATE, FLOOR_TABLE_DELETE, FLOOR_TABLE_MERGE,
+  // Payments
+  PAYMENT_READ, PAYMENT_CREATE,
+  // Feedback
+  FEEDBACK_READ,
+  // Sessions
+  SESSION_READ, SESSION_CLOSE,
 } from './permissions';
 
 /**
  * Role hierarchy - higher index = higher privilege
+ * 4-Role MVP: chef → waiter → manager → admin
  */
 export const ROLE_HIERARCHY: TenantUserRole[] = [
-  'kitchen_staff',
-  'foh_staff',
-  'menu_editor',
-  'manager',
-  'owner',
+  'chef',       // Level 0 — kitchen only
+  'waiter',     // Level 1 — front of house
+  'manager',    // Level 2 — daily operations (absorbed menu_editor)
+  'admin',      // Level 3 — full control
 ];
 
 /**
@@ -63,8 +79,10 @@ export function isRoleHigherThan(roleA: TenantUserRole | string, roleB: TenantUs
  * Permission sets for each role
  */
 export const ROLE_PERMISSIONS: Record<TenantUserRole, PermissionKey[]> = {
-  // Owner - Full access to everything
-  owner: [
+  // Admin (was owner) — 👑 Full Control
+  admin: [
+    // Dashboard
+    DASHBOARD_READ,
     // Menu
     MENU_READ, MENU_CREATE, MENU_UPDATE, MENU_DELETE, MENU_PUBLISH,
     // Items
@@ -83,86 +101,107 @@ export const ROLE_PERMISSIONS: Record<TenantUserRole, PermissionKey[]> = {
     OPTION_READ, OPTION_CREATE, OPTION_UPDATE, OPTION_DELETE,
     // Staff management
     STAFF_READ, STAFF_CREATE, STAFF_UPDATE, STAFF_DELETE,
-    // Dashboard & Analytics
-    DASHBOARD_READ, ANALYTICS_VIEW,
+    // Orders
+    ORDER_READ, ORDER_CREATE, ORDER_UPDATE, ORDER_DELETE,
+    // Analytics
+    ANALYTICS_VIEW, ANALYTICS_EXPORT,
+    // Settings
+    SETTINGS_READ, SETTINGS_UPDATE,
     // Reference data
     ALLERGEN_READ, DIETARY_READ,
+    // Admin Chatbot
+    CHATBOT_READ,
+    // Floor Plan
+    FLOOR_LAYOUT_READ, FLOOR_LAYOUT_CREATE, FLOOR_LAYOUT_UPDATE, FLOOR_LAYOUT_DELETE, FLOOR_LAYOUT_PUBLISH,
+    FLOOR_TABLE_READ, FLOOR_TABLE_CREATE, FLOOR_TABLE_UPDATE, FLOOR_TABLE_DELETE, FLOOR_TABLE_MERGE,
+    // Payments
+    PAYMENT_READ, PAYMENT_CREATE,
+    // Feedback
+    FEEDBACK_READ,
+    // Sessions
+    SESSION_READ, SESSION_CLOSE,
   ],
 
-  // Manager - Most access, limited staff management (can't delete staff)
+  // Manager (absorbs menu_editor) — 📊 Daily Operations
   manager: [
-    // Menu
-    MENU_READ, MENU_CREATE, MENU_UPDATE, MENU_PUBLISH,
-    // Items
+    // Dashboard
+    DASHBOARD_READ,
+    // Menu — full CRUD + publish
+    MENU_READ, MENU_CREATE, MENU_UPDATE, MENU_DELETE, MENU_PUBLISH,
+    // Items — full CRUD
     ITEM_READ, ITEM_CREATE, ITEM_UPDATE, ITEM_DELETE,
-    // Sections
+    // Sections — full CRUD
     SECTION_READ, SECTION_CREATE, SECTION_UPDATE, SECTION_DELETE,
-    // Locations (read only)
-    LOCATION_READ,
-    // Brands (read only)
-    BRAND_READ,
-    // Publications
+    // Brands — read + update only
+    BRAND_READ, BRAND_UPDATE,
+    // Locations — read + update only
+    LOCATION_READ, LOCATION_UPDATE,
+    // Publications — read + create + update (no delete)
     PUBLICATION_READ, PUBLICATION_CREATE, PUBLICATION_UPDATE,
-    // Ingredients
+    // Ingredients — full CRUD
     INGREDIENT_READ, INGREDIENT_CREATE, INGREDIENT_UPDATE, INGREDIENT_DELETE,
-    // Options
+    // Options — full CRUD
     OPTION_READ, OPTION_CREATE, OPTION_UPDATE, OPTION_DELETE,
-    // Staff management (limited)
+    // Staff — read + create + update (no delete)
     STAFF_READ, STAFF_CREATE, STAFF_UPDATE,
-    // Dashboard & Analytics
-    DASHBOARD_READ, ANALYTICS_VIEW,
+    // Orders — read + create + update (no delete)
+    ORDER_READ, ORDER_CREATE, ORDER_UPDATE,
+    // Analytics
+    ANALYTICS_VIEW, ANALYTICS_EXPORT,
+    // Settings — read only
+    SETTINGS_READ,
     // Reference data
     ALLERGEN_READ, DIETARY_READ,
+    // Admin Chatbot
+    CHATBOT_READ,
+    // Floor Plan — view only
+    FLOOR_LAYOUT_READ, FLOOR_TABLE_READ,
+    // Payments
+    PAYMENT_READ, PAYMENT_CREATE,
+    // Feedback
+    FEEDBACK_READ,
+    // Sessions
+    SESSION_READ, SESSION_CLOSE,
   ],
 
-  // Menu Editor - Can edit menu content, no staff/location management
-  menu_editor: [
-    // Menu (no delete, no publish)
-    MENU_READ, MENU_CREATE, MENU_UPDATE,
-    // Items
-    ITEM_READ, ITEM_CREATE, ITEM_UPDATE,
-    // Sections
-    SECTION_READ, SECTION_CREATE, SECTION_UPDATE,
-    // Locations (read only)
-    LOCATION_READ,
-    // Brands (read only)
-    BRAND_READ,
-    // Ingredients
-    INGREDIENT_READ, INGREDIENT_CREATE, INGREDIENT_UPDATE,
-    // Options
-    OPTION_READ, OPTION_CREATE, OPTION_UPDATE,
+  // Chef (was kitchen_staff) — 👨‍🍳 Kitchen Focus
+  chef: [
     // Dashboard
     DASHBOARD_READ,
-    // Reference data
-    ALLERGEN_READ, DIETARY_READ,
-  ],
-
-  // FOH Staff - Read-only access to menu for customer service
-  foh_staff: [
-    // Menu (read only)
-    MENU_READ,
-    // Items (read only)
+    // Items — read only
     ITEM_READ,
-    // Sections (read only)
+    // Sections — read only
     SECTION_READ,
-    // Locations (read only)
-    LOCATION_READ,
-    // Dashboard
-    DASHBOARD_READ,
-    // Reference data (for customer questions about allergens)
-    ALLERGEN_READ, DIETARY_READ,
-  ],
-
-  // Kitchen Staff - Read items and ingredients
-  kitchen_staff: [
-    // Items (read only)
-    ITEM_READ,
-    // Sections (read only)
-    SECTION_READ,
-    // Ingredients (read only)
+    // Ingredients — read only
     INGREDIENT_READ,
+    // Orders — read + update (status only)
+    ORDER_READ, ORDER_UPDATE,
     // Reference data
     ALLERGEN_READ, DIETARY_READ,
+  ],
+
+  // Waiter (was foh_staff) — 🍽️ Front of House
+  waiter: [
+    // Dashboard
+    DASHBOARD_READ,
+    // Menus — read only
+    MENU_READ,
+    // Items — read only
+    ITEM_READ,
+    // Sections — read only
+    SECTION_READ,
+    // Locations — read only
+    LOCATION_READ,
+    // Orders — read + create + update
+    ORDER_READ, ORDER_CREATE, ORDER_UPDATE,
+    // Reference data
+    ALLERGEN_READ, DIETARY_READ,
+    // Floor Plan — view only
+    FLOOR_LAYOUT_READ, FLOOR_TABLE_READ,
+    // Sessions
+    SESSION_READ,
+    // Payments — read only
+    PAYMENT_READ,
   ],
 };
 

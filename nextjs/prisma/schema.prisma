@@ -110,6 +110,7 @@ model Location {
   tenant           Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   brand            Brand             @relation(fields: [brandId], references: [id], onDelete: Cascade)
   diningTables     DiningTable[]
+  floorLayouts     FloorLayout[]
   menuPublications MenuPublication[]
 
   @@unique([tenantId, slug])
@@ -134,6 +135,187 @@ model DiningTable {
   @@unique([tenantId, locationId, label])
   @@unique([tenantId, locationId, qrCodeValue])
   @@map("dining_tables")
+}
+
+// ============================================
+// FLOOR LAYOUTS (Versioned restaurant floor plans)
+// ============================================
+model FloorLayout {
+  id          String    @id @default(uuid()) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  locationId  String    @map("location_id") @db.Uuid
+  name        String    @db.VarChar(255) // e.g., "Lunch Layout", "Weekend Layout"
+  description String?
+  floor       Int       @default(0) // 0 = ground, 1 = first floor, -1 = basement
+  status      String    @default("draft") @db.VarChar(20) // draft | published | archived
+  version     Int       @default(1)
+  canvasWidth  Int      @default(1200) @map("canvas_width")  // px
+  canvasHeight Int      @default(800) @map("canvas_height")  // px
+  gridSize    Int       @default(20) @map("grid_size") // snap grid in px
+  scale       Float     @default(1.0) // 1 meter = scale * gridSize px
+  bgImageUrl  String?   @map("bg_image_url") // optional blueprint image
+  publishedAt DateTime? @map("published_at") @db.Timestamptz
+  isActive    Boolean   @default(true) @map("is_active")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  location  Location        @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  zones     FloorZone[]
+  tables    FloorTable[]
+  obstacles FloorObstacle[]
+
+  @@unique([tenantId, locationId, name, version])
+  @@index([tenantId, locationId])
+  @@index([tenantId, status])
+  @@map("floor_layouts")
+}
+
+// ============================================
+// FLOOR ZONES (Sections of the restaurant: Terrace, Main Hall, Bar, etc.)
+// ============================================
+model FloorZone {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  layoutId  String   @map("layout_id") @db.Uuid
+  name      String   @db.VarChar(100) // e.g., "Main Hall", "Terrace", "VIP Area"
+  color     String   @default("#E5E7EB") @db.VarChar(20) // fill color
+  x         Float    @default(0) // position on canvas
+  y         Float    @default(0)
+  width     Float    @default(200)
+  height    Float    @default(200)
+  rotation  Float    @default(0) // degrees
+  shape     String   @default("rectangle") @db.VarChar(30) // rectangle | polygon
+  points    Json?    // for polygon shapes: [{x, y}, ...]
+  zIndex    Int      @default(0) @map("z_index")
+  isLocked  Boolean  @default(false) @map("is_locked")
+  metadata  Json     @default("{}") // extra data: indoor/outdoor, smoking, etc.
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  layout FloorLayout  @relation(fields: [layoutId], references: [id], onDelete: Cascade)
+  tables FloorTable[]
+
+  @@index([tenantId, layoutId])
+  @@map("floor_zones")
+}
+
+// ============================================
+// FLOOR TABLES (Physical tables on the floor plan)
+// ============================================
+model FloorTable {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  layoutId     String   @map("layout_id") @db.Uuid
+  zoneId       String?  @map("zone_id") @db.Uuid
+  label        String   @db.VarChar(50) // e.g., "T1", "T12"
+  friendlyName String?  @map("friendly_name") @db.VarChar(100) // e.g., "VIP Booth"
+  shape        String   @default("rectangle") @db.VarChar(30) // round | square | rectangle | oval | polygon
+  x            Float    @default(0) // position on canvas
+  y            Float    @default(0)
+  width        Float    @default(80) // size in px
+  height       Float    @default(80)
+  rotation     Float    @default(0) // degrees (0-360)
+  capacity     Int      @default(4) // max seating
+  minCapacity  Int      @default(1) @map("min_capacity") // minimum reservation size
+  color        String   @default("#6366F1") @db.VarChar(20) // default indigo
+  category     String   @default("dine_in") @db.VarChar(30) // dine_in | outdoor | vip | bar | staff
+  zIndex       Int      @default(10) @map("z_index")
+  isLocked     Boolean  @default(false) @map("is_locked")
+  isActive     Boolean  @default(true) @map("is_active")
+  status       String   @default("active") @db.VarChar(20) // active | disabled | seasonal
+  notes        String?  // special instructions
+  metadata     Json     @default("{}") // extra data
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  layout          FloorLayout         @relation(fields: [layoutId], references: [id], onDelete: Cascade)
+  zone            FloorZone?          @relation(fields: [zoneId], references: [id], onDelete: SetNull)
+  chairs          FloorChair[]
+  mergedGroupLink MergedTableMember[]
+  tableSessions   TableSession[]
+
+  @@unique([tenantId, layoutId, label])
+  @@index([tenantId, layoutId])
+  @@map("floor_tables")
+}
+
+// ============================================
+// FLOOR CHAIRS (Individual chair positions around tables)
+// ============================================
+model FloorChair {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  tableId   String   @map("table_id") @db.Uuid
+  offsetX   Float    @default(0) @map("offset_x") // relative to table center
+  offsetY   Float    @default(0) @map("offset_y")
+  rotation  Float    @default(0) // degrees
+  chairType String   @default("normal") @map("chair_type") @db.VarChar(30) // normal | bar_stool | booth | highchair
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  table FloorTable @relation(fields: [tableId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, tableId])
+  @@map("floor_chairs")
+}
+
+// ============================================
+// FLOOR OBSTACLES (Walls, doors, windows, pillars, bar, kitchen)
+// ============================================
+model FloorObstacle {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  layoutId  String   @map("layout_id") @db.Uuid
+  kind      String   @db.VarChar(30) // wall | door | window | pillar | bar | kitchen | pathway | stairs
+  label     String?  @db.VarChar(100)
+  x         Float    @default(0)
+  y         Float    @default(0)
+  width     Float    @default(100)
+  height    Float    @default(20)
+  rotation  Float    @default(0)
+  points    Json?    // for irregular shapes
+  color     String   @default("#9CA3AF") @db.VarChar(20)
+  zIndex    Int      @default(5) @map("z_index")
+  isLocked  Boolean  @default(false) @map("is_locked")
+  metadata  Json     @default("{}")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  layout FloorLayout @relation(fields: [layoutId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, layoutId])
+  @@map("floor_obstacles")
+}
+
+// ============================================
+// MERGED TABLE GROUPS (Temporary combinations for large parties)
+// ============================================
+model MergedTableGroup {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  layoutId   String   @map("layout_id") @db.Uuid
+  groupLabel String   @map("group_label") @db.VarChar(50) // e.g., "G1"
+  capacity   Int      @default(0) // combined capacity
+  isActive   Boolean  @default(true) @map("is_active")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  members MergedTableMember[]
+
+  @@index([tenantId, layoutId])
+  @@map("merged_table_groups")
+}
+
+model MergedTableMember {
+  id      String @id @default(uuid()) @db.Uuid
+  groupId String @map("group_id") @db.Uuid
+  tableId String @map("table_id") @db.Uuid
+
+  group MergedTableGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  table FloorTable       @relation(fields: [tableId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, tableId])
+  @@map("merged_table_members")
 }
 
 // ============================================
@@ -704,7 +886,7 @@ model AdminUser {
   email        String         @db.VarChar(255)
   displayName  String?        @map("display_name") @db.VarChar(255)
   passwordHash String         @map("password_hash")
-  role         TenantUserRole @default(menu_editor)
+  role         TenantUserRole @default(manager)
   permissions  Json           @default("[]") // Additional granular permissions
   locationIds  String[]       @default([]) @map("location_ids") @db.Uuid // Restrict to specific locations
   isActive     Boolean        @default(true) @map("is_active")
@@ -889,9 +1071,234 @@ model PlatformAdmin {
 // TENANT USER ROLES (Restaurant-Level Roles)
 // ============================================
 enum TenantUserRole {
-  owner           // Full access to own restaurant(s)
-  manager         // Manage menus, analytics, staff, orders
-  menu_editor     // Create/edit menu items, sections, ingredients
-  foh_staff       // Front of House - view menu, process orders
-  kitchen_staff   // View orders, update status, ingredients
+  admin           // Full access to own restaurant(s) — was: owner
+  manager         // Daily operations, absorbs menu_editor permissions
+  chef            // Kitchen focused — was: kitchen_staff
+  waiter          // Front of House — was: foh_staff
+}
+
+// ============================================
+// ORDER STATUS ENUM
+// ============================================
+enum OrderStatus {
+  pending
+  confirmed
+  preparing
+  ready
+  served
+  completed
+  cancelled
+}
+
+// ============================================
+// ORDER ITEM STATUS ENUM
+// ============================================
+enum OrderItemStatus {
+  pending
+  preparing
+  ready
+  served
+  cancelled
+}
+
+// ============================================
+// TABLE SESSION STATUS ENUM
+// ============================================
+enum TableSessionStatus {
+  open
+  bill_requested
+  paid
+  closed
+}
+
+// ============================================
+// PAYMENT STATUS ENUM
+// ============================================
+enum PaymentStatus {
+  pending
+  completed
+  refunded
+}
+
+// ============================================
+// PAYMENT METHOD ENUM
+// ============================================
+enum PaymentMethod {
+  cash
+  card
+  app
+}
+
+// ============================================
+// CUSTOMER (Guest / Registered)
+// ============================================
+model Customer {
+  id                  String   @id @default(uuid()) @db.Uuid
+  tenantId            String   @map("tenant_id") @db.Uuid
+  email               String?  @db.VarChar(255)
+  name                String?  @db.VarChar(255)
+  phone               String?  @db.VarChar(50)
+  passwordHash        String?  @map("password_hash")
+  isGuest             Boolean  @default(true) @map("is_guest")
+  locale              String   @default("en-US") @db.VarChar(10)
+  dietaryPreferences  Json     @default("{}") @map("dietary_preferences")
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt           DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  tableSessions TableSession[]
+  favorites     CustomerFavorite[]
+  feedback      Feedback[]
+
+  @@unique([tenantId, email])
+  @@index([tenantId])
+  @@map("customers")
+}
+
+// ============================================
+// TABLE SESSION (Groups all orders for one seating)
+// ============================================
+model TableSession {
+  id           String             @id @default(uuid()) @db.Uuid
+  tenantId     String             @map("tenant_id") @db.Uuid
+  locationId   String             @map("location_id") @db.Uuid
+  tableId      String             @map("table_id") @db.Uuid
+  customerId   String?            @map("customer_id") @db.Uuid
+  sessionCode  String             @unique @map("session_code") @db.VarChar(20)
+  status       TableSessionStatus @default(open)
+  guestCount   Int                @default(1) @map("guest_count")
+  specialNotes String?            @map("special_notes")
+  openedAt     DateTime           @default(now()) @map("opened_at") @db.Timestamptz
+  closedAt     DateTime?          @map("closed_at") @db.Timestamptz
+  paidAt       DateTime?          @map("paid_at") @db.Timestamptz
+
+  table    FloorTable @relation(fields: [tableId], references: [id], onDelete: Cascade)
+  customer Customer?  @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  orders   Order[]
+  payments Payment[]
+  feedback Feedback[]
+
+  @@index([tenantId, locationId])
+  @@index([tenantId, tableId, status])
+  @@index([sessionCode])
+  @@map("table_sessions")
+}
+
+// ============================================
+// ORDER
+// ============================================
+model Order {
+  id                  String      @id @default(uuid()) @db.Uuid
+  tenantId            String      @map("tenant_id") @db.Uuid
+  sessionId           String      @map("session_id") @db.Uuid
+  orderNumber         Int         @map("order_number")
+  status              OrderStatus @default(pending)
+  specialInstructions String?     @map("special_instructions")
+  subtotalMinor       BigInt      @default(0) @map("subtotal_minor")
+  taxMinor            BigInt      @default(0) @map("tax_minor")
+  totalMinor          BigInt      @default(0) @map("total_minor")
+  currency            String      @default("EUR") @db.VarChar(10)
+  confirmedById       String?     @map("confirmed_by_id") @db.Uuid
+  confirmedAt         DateTime?   @map("confirmed_at") @db.Timestamptz
+  prepStartedAt       DateTime?   @map("prep_started_at") @db.Timestamptz
+  readyAt             DateTime?   @map("ready_at") @db.Timestamptz
+  servedAt            DateTime?   @map("served_at") @db.Timestamptz
+  servedById          String?     @map("served_by_id") @db.Uuid
+  cancelledAt         DateTime?   @map("cancelled_at") @db.Timestamptz
+  cancelReason        String?     @map("cancel_reason")
+  createdAt           DateTime    @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt           DateTime    @updatedAt @map("updated_at") @db.Timestamptz
+
+  session TableSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  items   OrderItem[]
+
+  @@index([tenantId, sessionId])
+  @@index([tenantId, status])
+  @@index([tenantId, createdAt(sort: Desc)])
+  @@map("orders")
+}
+
+// ============================================
+// ORDER ITEM
+// ============================================
+model OrderItem {
+  id              String          @id @default(uuid()) @db.Uuid
+  tenantId        String          @map("tenant_id") @db.Uuid
+  orderId         String          @map("order_id") @db.Uuid
+  itemId          String          @map("item_id") @db.Uuid
+  itemName        String          @map("item_name") @db.VarChar(255)
+  quantity        Int             @default(1)
+  unitPriceMinor  BigInt          @map("unit_price_minor")
+  totalPriceMinor BigInt          @map("total_price_minor")
+  selectedOptions Json            @default("[]") @map("selected_options")
+  specialNote     String?         @map("special_note")
+  status          OrderItemStatus @default(pending)
+  createdAt       DateTime        @default(now()) @map("created_at") @db.Timestamptz
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, orderId])
+  @@map("order_items")
+}
+
+// ============================================
+// PAYMENT
+// ============================================
+model Payment {
+  id              String        @id @default(uuid()) @db.Uuid
+  tenantId        String        @map("tenant_id") @db.Uuid
+  sessionId       String        @map("session_id") @db.Uuid
+  method          PaymentMethod @default(cash)
+  amountMinor     BigInt        @map("amount_minor")
+  currency        String        @default("EUR") @db.VarChar(10)
+  tipMinor        BigInt        @default(0) @map("tip_minor")
+  discountMinor   BigInt        @default(0) @map("discount_minor")
+  discountReason  String?       @map("discount_reason")
+  processedById   String?       @map("processed_by_id") @db.Uuid
+  status          PaymentStatus @default(pending)
+  receiptNumber   String?       @map("receipt_number") @db.VarChar(50)
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz
+
+  session TableSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, sessionId])
+  @@map("payments")
+}
+
+// ============================================
+// FEEDBACK
+// ============================================
+model Feedback {
+  id              String   @id @default(uuid()) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  sessionId       String   @map("session_id") @db.Uuid
+  customerId      String?  @map("customer_id") @db.Uuid
+  overallRating   Int      @map("overall_rating") @db.SmallInt
+  foodRating      Int?     @map("food_rating") @db.SmallInt
+  serviceRating   Int?     @map("service_rating") @db.SmallInt
+  ambianceRating  Int?     @map("ambiance_rating") @db.SmallInt
+  valueRating     Int?     @map("value_rating") @db.SmallInt
+  comment         String?
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  session  TableSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  customer Customer?    @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, sessionId])
+  @@map("feedback")
+}
+
+// ============================================
+// CUSTOMER FAVORITE
+// ============================================
+model CustomerFavorite {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  customerId String   @map("customer_id") @db.Uuid
+  itemId     String   @map("item_id") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, customerId, itemId])
+  @@map("customer_favorites")
 }
